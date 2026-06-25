@@ -1,0 +1,537 @@
+--Trigger de Seguridad Lógica Autónoma
+-- Función que ejecuta la lógica de bloqueo
+CREATE OR REPLACE FUNCTION fn_seguridad_bloqueo_cuenta()
+RETURNS TRIGGER AS $$
+BEGIN
+    -- Validamos si los intentos fallidos alcanzan o superan el límite de 3
+    IF NEW.conteo_intentos_fallidos >= 3 THEN
+        NEW.estado_cuenta := 'Bloqueada';
+    END IF;
+    
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- 3. Creamos el Trigger anclado al UPDATE de la columna específica
+CREATE TRIGGER trg_seguridad_bloqueo_cuenta
+BEFORE UPDATE OF conteo_intentos_fallidos ON usuario
+FOR EACH ROW
+EXECUTE FUNCTION fn_seguridad_bloqueo_cuenta();
+
+
+--Procedimiento Almacenado: Registro de Login Exitoso
+CREATE OR REPLACE PROCEDURE sp_registrar_login_exitoso(
+    p_cedula VARCHAR
+)
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    -- Se actualiza la última conexión y se resetean los errores a 0
+    UPDATE usuario
+    SET ultima_conexion = CURRENT_TIMESTAMP,
+        conteo_intentos_fallidos = 0
+    WHERE cedula = p_cedula 
+      AND estado_cuenta = 'Activa'; -- Solo si la cuenta no fue bloqueada previamente
+END;
+$$;
+
+
+--Cálculo del Índice de Recurrencia
+CREATE OR REPLACE PROCEDURE sp_actualizar_fidelidad(
+    p_id_usuario BIGINT
+)
+LANGUAGE plpgsql
+AS $$
+DECLARE
+    v_total_tramites INT;
+BEGIN
+    -- Contamos cuántas solicitudes de servicio ha realizado el usuario histórico
+    SELECT COUNT(*) INTO v_total_tramites
+    FROM solicitud_servicio
+    WHERE id_usuario = p_id_usuario;
+    
+    -- Actualizamos su perfil basándonos en reglas de negocio (CORREGIDO 'VIP' por 'Preferencial')
+    UPDATE usuario
+    SET indice_recurrencia = v_total_tramites,
+        categoria_fidelidad = CASE 
+            WHEN v_total_tramites >= 15 THEN 'Preferencial'
+            WHEN v_total_tramites >= 5 THEN 'Frecuente'
+            ELSE 'Regular'
+        END
+    WHERE id_usuario = p_id_usuario;
+END;
+$$;
+
+
+
+--Trigger de Ruptura de Vínculo Familiar
+-- Función que ejecuta la lógica de inhabilitación de cobertura
+CREATE OR REPLACE FUNCTION fn_ruptura_vinculo_beneficiarios()
+RETURNS TRIGGER AS $$
+BEGIN
+    -- Si la cuenta del titular pasa a estar inactiva (Suspendida o Bloqueada)
+    IF NEW.estado_cuenta IN ('Suspendida', 'Bloqueada') AND OLD.estado_cuenta = 'Activa' THEN
+        
+        -- Buscamos a todos sus familiares y cerramos su lapso de cobertura activo
+        -- CORRECCIÓN: Nombre correcto de la tabla
+        UPDATE historial_fechas_cobertura 
+        SET fecha_fin = CURRENT_DATE, 
+            estatus_lapso = 'Inhabilitado'
+        WHERE ci_familiar IN (
+            SELECT ci_familiar 
+            FROM beneficiario_familiar 
+            WHERE id_usuario = NEW.id_usuario -- CORRECCIÓN: Nombre de columna correcto
+        ) 
+        AND estatus_lapso = 'Activo';
+        
+    END IF;
+
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_ruptura_vinculo_beneficiarios
+AFTER UPDATE OF estado_cuenta ON usuario
+FOR EACH ROW
+EXECUTE FUNCTION fn_ruptura_vinculo_beneficiarios();
+
+
+
+--Procedimiento Almacenado: Transición por Mayoría de Edad
+CREATE OR REPLACE PROCEDURE sp_transicion_mayoria_edad()
+LANGUAGE plpgsql AS $$
+BEGIN
+    UPDATE beneficiario_familiar
+    SET constancia_estudios_universitarios = 'Pendiente',
+        certificado_solteria = 'Pendiente',
+	centro_educacion_inicial = 'Pendiente'
+    WHERE LOWER(TRIM(parentesco)) IN ('hijo', 'hija', 'hijo/a') -- Valida el parentesco
+      AND EXTRACT(YEAR FROM AGE(CURRENT_DATE, fecha_nacimiento)) >= 18 -- Valida que sea mayor de edad
+      AND (
+          LOWER(TRIM(constancia_estudios_universitarios)) = 'no aplica' 
+          OR LOWER(TRIM(certificado_solteria)) = 'no aplica'
+	  OR LOWER(TRIM(centro_educacion_inicial)) = 'no aplica'
+      ); 
+END;
+$$;
+
+
+
+--Procedimiento Batch: Limpieza de Acompañantes Temporales
+CREATE OR REPLACE PROCEDURE sp_archivar_acompanantes_temporales()
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    -- Borramos a todos los acompañantes cuyo pase temporal sea menor a la fecha de hoy
+    DELETE FROM acompanante_temporal
+    WHERE fecha_expiracion < CURRENT_DATE;
+END;
+$$;
+
+
+--Trigger: El "Candado de Disponibilidad" (Prevención de Solapamiento)
+-- Función que ejecuta la validación del candado
+CREATE OR REPLACE FUNCTION fn_candado_disponibilidad_reserva()
+RETURNS TRIGGER AS $$
+DECLARE
+    v_existe INT;
+BEGIN
+    -- Buscamos si ya hay una reserva para ese mismo lugar, día y hora exacta
+    SELECT COUNT(*) INTO v_existe
+    FROM reserva
+    WHERE nombre_sede = NEW.nombre_sede
+      AND nombre_edificio = NEW.nombre_edificio
+      AND id_espacio = NEW.id_espacio
+      AND fecha_reserva = NEW.fecha_reserva
+      AND bloque_horario_solicitado = NEW.bloque_horario_solicitado;
+
+    -- Si el conteo es mayor a 0, lanzamos el error para bloquear el INSERT
+    IF v_existe > 0 THEN
+        RAISE EXCEPTION 'Candado de Seguridad: El espacio % en el edificio % ya está reservado para la fecha % en el bloque %.', 
+        NEW.id_espacio, NEW.nombre_edificio, NEW.fecha_reserva, NEW.bloque_horario_solicitado;
+    END IF;
+
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Trigger que se dispara ANTES de insertar una nueva reserva
+CREATE TRIGGER trg_candado_disponibilidad_reserva
+BEFORE INSERT OR UPDATE ON reserva
+FOR EACH ROW
+EXECUTE FUNCTION fn_candado_disponibilidad_reserva();
+
+
+
+--Trigger: Validación del Estado de Mantenimiento
+CREATE OR REPLACE FUNCTION fn_validar_mantenimiento_espacio()
+RETURNS TRIGGER AS $$
+DECLARE
+    v_estado_mantenimiento VARCHAR(50);
+BEGIN
+    -- Vamos a la tabla de infraestructura a ver cómo está el espacio físico
+    SELECT estado_mantenimiento INTO v_estado_mantenimiento
+    FROM espacio_fisico
+    WHERE nombre_sede = NEW.nombre_sede
+      AND nombre_edificio = NEW.nombre_edificio
+      AND id_espacio = NEW.id_espacio;
+
+    -- Si está dañado o en mantenimiento, bloqueamos la reserva de inmediato
+    IF v_estado_mantenimiento IN ('En Reparación', 'Clausurado') THEN
+        RAISE EXCEPTION 'Operación rechazada: El espacio % no se puede reservar porque se encuentra en estado de %.', 
+        NEW.id_espacio, v_estado_mantenimiento;
+    END IF;
+
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_validar_mantenimiento_espacio
+BEFORE INSERT ON reserva
+FOR EACH ROW
+EXECUTE FUNCTION fn_validar_mantenimiento_espacio();
+
+
+--Procedure: Actualizador de la "Caché de Disponibilidad"
+CREATE OR REPLACE PROCEDURE sp_actualizar_cache_disponibilidad()
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    -- 1. Ponemos Fuera de Servicio todo lo que esté dañado o en mantenimiento
+    UPDATE espacio_fisico
+    SET registro_disponibilidad = 'Ocupado'
+    WHERE estado_mantenimiento IN ('En Reparación', 'Clausurado');
+
+    -- 2. Ponemos Disponible todo lo que esté Operativo
+    UPDATE espacio_fisico
+    SET registro_disponibilidad = 'Disponible'
+    WHERE estado_mantenimiento = 'Operativo';
+
+    -- (Nota: El estado 'Ocupado' lo controlarán las reservas por bloque horario)
+END;
+$$;
+
+
+--Trigger de Integridad Transaccional: Billetera TAI
+-- Función que procesa el débito y calcula el atributo derivado
+CREATE OR REPLACE FUNCTION fn_procesar_pago_tai()
+RETURNS TRIGGER AS $$
+DECLARE
+    v_saldo_actual NUMERIC;
+BEGIN
+    -- 1. Buscamos el saldo que tiene el usuario en su chip
+    SELECT saldo_virtual INTO v_saldo_actual
+    FROM billetera_virtual_tai
+    WHERE uid_chip = NEW.uid_chip;
+
+    -- 2. Verificamos si tiene fondos suficientes
+    IF v_saldo_actual < NEW.monto_operacion THEN
+        RAISE EXCEPTION 'Fondos Insuficientes en la Billetera TAI. Saldo actual: %', v_saldo_actual;
+    END IF;
+
+    -- 3. Le descontamos el dinero de la billetera
+    UPDATE billetera_virtual_tai
+    SET saldo_virtual = saldo_virtual - NEW.monto_operacion
+    WHERE uid_chip = NEW.uid_chip;
+
+    -- 4. Registramos en el recibo (la tabla pago_tai) cuánto le quedó después de pagar
+    NEW.saldo_remanente := v_saldo_actual - NEW.monto_operacion;
+
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Trigger que se dispara ANTES de registrar el pago
+CREATE TRIGGER trg_procesar_pago_tai
+BEFORE INSERT ON pago_tai
+FOR EACH ROW
+EXECUTE FUNCTION fn_procesar_pago_tai();
+
+
+
+--Trigger Polimórfico: Amortización de Facturas
+CREATE OR REPLACE FUNCTION fn_amortizar_saldo_factura()
+RETURNS TRIGGER AS $$
+BEGIN
+    -- Descontamos el monto de la operación del saldo de la factura
+    -- USANDO LA LLAVE COMPUESTA EXACTA (numero y usuario)
+    UPDATE factura
+    SET saldo_factura = saldo_factura - NEW.monto_operacion
+    WHERE numero_control = NEW.numero_control_factura
+      AND id_usuario = NEW.id_usuario;
+
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Conectamos esta MISMA función a múltiples tablas de pago (Table-per-Concrete-Class)
+CREATE TRIGGER trg_amortizar_factura_zelle
+AFTER INSERT ON pago_zelle FOR EACH ROW EXECUTE FUNCTION fn_amortizar_saldo_factura();
+
+CREATE TRIGGER trg_amortizar_factura_tarjeta
+AFTER INSERT ON pago_tarjeta FOR EACH ROW EXECUTE FUNCTION fn_amortizar_saldo_factura();
+
+CREATE TRIGGER trg_amortizar_factura_tai
+AFTER INSERT ON pago_tai FOR EACH ROW EXECUTE FUNCTION fn_amortizar_saldo_factura();
+
+
+
+
+--Procedimiento Almacenado: Cierre de Trámite y Generación de Factura
+CREATE OR REPLACE PROCEDURE sp_generar_factura_desde_estado_cuenta(
+    p_numero_folio BIGINT, 
+    p_ci_usuario VARCHAR
+)
+LANGUAGE plpgsql
+AS $$
+DECLARE
+    v_id_usuario BIGINT;
+    v_total_factura NUMERIC(15,2);
+    v_nuevo_numero_control VARCHAR(50);
+BEGIN
+    -- 1. Traducimos la Cédula (VARCHAR) al ID de Usuario (BIGINT)
+    SELECT id_usuario INTO v_id_usuario
+    FROM usuario
+    WHERE cedula = p_ci_usuario;
+
+    IF NOT FOUND THEN
+        RAISE EXCEPTION 'No existe un usuario con la cédula %', p_ci_usuario;
+    END IF;
+
+    -- 2. Calculamos la suma total de los consumos del estado de cuenta
+    -- Fórmula: (cantidad * precio_unitario) + impuestos
+    SELECT COALESCE(SUM((cantidad * precio_unitario) + impuestos_ley), 0)
+    INTO v_total_factura
+    FROM item_consumo
+    WHERE numero_folio = p_numero_folio;
+
+    -- 3. Generamos un código de control único (Ej: FAC-FOLIO-1000)
+    v_nuevo_numero_control := 'FAC-FOLIO-' || p_numero_folio;
+
+    -- 4. Creamos la factura
+    INSERT INTO factura (numero_control, id_usuario, numero_folio, fecha_emision, saldo_factura)
+    VALUES (v_nuevo_numero_control, v_id_usuario, p_numero_folio, CURRENT_DATE, v_total_factura);
+END;
+$$;
+
+
+--Trigger: Validador de Consignación de Requisitos
+-- Función que valida si el usuario cumple la malla de requisitos
+CREATE OR REPLACE FUNCTION fn_validar_requisitos_tramite()
+RETURNS TRIGGER AS $$
+DECLARE
+    v_requisitos_faltantes INT;
+BEGIN
+    -- Validamos si la solicitud nace cerrada o si alguien intenta actualizarla para cerrarla
+    IF NEW.fecha_hora_cierre IS NOT NULL THEN
+        
+        -- Buscamos EXACTAMENTE cuántos requisitos pide el servicio
+        -- y verificamos que NO EXISTAN en la tabla de entregas del estudiante
+        SELECT COUNT(e.id_acreditacion) INTO v_requisitos_faltantes
+        FROM exige e
+        WHERE e.id_servicio = NEW.id_servicio 
+          AND NOT EXISTS (
+              SELECT 1 
+              FROM entrega_requisito er 
+              WHERE er.id_solicitud = NEW.id_solicitud 
+                AND er.id_acreditacion = e.id_acreditacion
+          );
+
+        -- Si la cuenta de faltantes da más de 0, trancamos la operación inmediatamente
+        IF v_requisitos_faltantes > 0 THEN
+            RAISE EXCEPTION ' Trámite bloqueado. Faltan % requisito(s) por consignar para procesar la solicitud %.', v_requisitos_faltantes, NEW.id_solicitud;
+        END IF;
+        
+    END IF;
+
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_validar_requisitos_tramite
+BEFORE INSERT OR UPDATE ON solicitud_servicio
+FOR EACH ROW EXECUTE FUNCTION fn_validar_requisitos_tramite();
+
+
+
+--Procedimiento: Auditoría de Vencimiento de Documentos
+CREATE OR REPLACE PROCEDURE sp_auditar_vencimiento_documentos()
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    -- 1. Auditar y eliminar aliados externos cuyo contrato expiró
+    -- (Opcionalmente podría cambiar un estatus, pero según Creates.txt no hay estatus en aliado_externo, 
+    -- por ende, se revoca el permiso o se elimina según la regla).
+    DELETE FROM aliado_externo
+    WHERE fecha_vencimiento_contrato < CURRENT_DATE;
+
+    -- 2. Auditar fechas de cobertura familiar (basado en historial_fechas_cobertura)
+    UPDATE historial_fechas_cobertura
+    SET estatus_lapso = 'Vencido'
+    WHERE fecha_fin < CURRENT_DATE AND estatus_lapso = 'Activo';
+END;
+$$;
+
+
+--Función: Cálculo de Prioridad de Atención
+CREATE OR REPLACE FUNCTION fn_calcular_prioridad_tramite(p_id_usuario BIGINT)
+RETURNS VARCHAR AS $$
+DECLARE
+    v_fidelidad VARCHAR(20);
+    v_prioridad VARCHAR(20);
+BEGIN
+    -- Obtenemos directamente la categoría calculada del usuario
+    SELECT categoria_fidelidad INTO v_fidelidad
+    FROM usuario
+    WHERE id_usuario = p_id_usuario;
+    
+    -- Mapeo de Fidelidad a Prioridad del Trámite
+    v_prioridad := CASE 
+        WHEN v_fidelidad = 'Preferencial' THEN 'Alta'
+        WHEN v_fidelidad = 'Frecuente' THEN 'Media'
+        ELSE 'Baja'
+    END;
+    
+    RETURN v_prioridad;
+END;
+$$ LANGUAGE plpgsql;
+
+
+--Trigger de Trazabilidad y Cierre Automático
+CREATE OR REPLACE FUNCTION fn_avance_secuencial_paso() 
+RETURNS TRIGGER AS $$ 
+DECLARE 
+    v_total_pasos INT; 
+    v_pasos_completados INT;
+BEGIN 
+    -- 1. Inyectar hora exacta si se completó el paso
+    IF NEW.estado_paso = 'Completado' AND OLD.estado_paso != 'Completado' THEN
+        NEW.fecha_hora_finalizacion_exacta := CURRENT_TIMESTAMP;
+    END IF;
+
+    -- 2. Trazabilidad de cierre (Validar si es el último paso)
+    -- Contar pasos totales para ESTA solicitud y ESTE usuario
+    SELECT COUNT(*) INTO v_total_pasos 
+    FROM paso_actividad 
+    WHERE id_solicitud = NEW.id_solicitud AND id_usuario = NEW.id_usuario;
+
+    -- Contar cuántos están en 'Completado'
+    SELECT COUNT(*) INTO v_pasos_completados 
+    FROM paso_actividad 
+    WHERE id_solicitud = NEW.id_solicitud AND id_usuario = NEW.id_usuario AND estado_paso = 'Completado';
+
+    -- Si los completados + este nuevo paso alcanzan el total, cerramos el trámite matriz
+    -- CORRECCIÓN APLICADA: Uso de llave compuesta en el UPDATE
+    IF v_pasos_completados >= v_total_pasos THEN
+        UPDATE solicitud_servicio
+        SET fecha_hora_cierre = CURRENT_TIMESTAMP
+        WHERE id_solicitud = NEW.id_solicitud 
+          AND id_usuario = NEW.id_usuario; -- Llave compuesta obligatoria
+    END IF;
+
+    RETURN NEW;
+END; 
+$$ LANGUAGE plpgsql;
+
+-- El trigger debe estar anclado correctamente
+CREATE TRIGGER trg_avance_secuencial
+BEFORE UPDATE OF estado_paso ON paso_actividad
+FOR EACH ROW
+EXECUTE FUNCTION fn_avance_secuencial_paso();
+
+
+-- 2. Trigger Posterior: Cierre de la Solicitud
+CREATE OR REPLACE FUNCTION fn_cerrar_solicitud_automatica()
+RETURNS TRIGGER AS $$
+DECLARE
+    v_pasos_pendientes INT;
+BEGIN
+    -- Validación de estado del paso actual
+    IF NEW.estado_paso = 'Completado' THEN
+        -- Conteo unificado de pasos no completados para la solicitud específica
+        SELECT COUNT(*) INTO v_pasos_pendientes
+        FROM paso_actividad
+        WHERE id_solicitud = NEW.id_solicitud 
+          AND id_usuario = NEW.id_usuario 
+          AND estado_paso != 'Completado';
+
+        -- Cierre automático utilizando llave primaria compuesta
+        IF v_pasos_pendientes = 0 THEN
+            UPDATE solicitud_servicio
+            SET fecha_hora_cierre = CURRENT_TIMESTAMP
+            WHERE id_solicitud = NEW.id_solicitud 
+              AND id_usuario = NEW.id_usuario;
+        END IF;
+    END IF;
+    
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Anclaje del trigger
+CREATE TRIGGER trg_cerrar_solicitud
+AFTER UPDATE OF estado_paso ON paso_actividad
+FOR EACH ROW
+EXECUTE FUNCTION fn_cerrar_solicitud_automatica();
+
+
+
+--Trigger del "Pago Único al 100%" y Tasa BCV
+CREATE OR REPLACE FUNCTION fn_validar_y_procesar_pago()
+RETURNS TRIGGER AS $$
+DECLARE
+    v_saldo_pendiente NUMERIC(15,2);
+    v_monto_calculado NUMERIC(15,2);
+BEGIN
+    -- Extracción del saldo pendiente usando llave compuesta
+    SELECT saldo_factura INTO v_saldo_pendiente
+    FROM factura
+    WHERE numero_control = NEW.numero_control_factura
+      AND id_usuario = NEW.id_usuario;
+
+    v_monto_calculado := NEW.monto_operacion; 
+
+    -- Restricción de abonos parciales (Monto exacto requerido)
+    IF v_monto_calculado < (v_saldo_pendiente - 0.01) THEN
+        RAISE EXCEPTION 'Pago rechazado. No se permiten abonos parciales. Monto requerido: %', v_saldo_pendiente;
+    END IF;
+
+    -- Liquidación de factura (Solo actualizamos el saldo, porque tu tabla no tiene estado_factura)
+    UPDATE factura
+    SET saldo_factura = 0
+    WHERE numero_control = NEW.numero_control_factura
+      AND id_usuario = NEW.id_usuario;
+
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_validar_pago_efectivo
+BEFORE INSERT ON pago_efectivo
+FOR EACH ROW
+EXECUTE FUNCTION fn_validar_y_procesar_pago();
+
+CREATE TRIGGER trg_validar_pago_zelle
+BEFORE INSERT ON pago_zelle  
+FOR EACH ROW
+EXECUTE FUNCTION fn_validar_y_procesar_pago();
+
+CREATE TRIGGER trg_validar_pago_tarjeta
+BEFORE INSERT ON pago_tarjeta 
+FOR EACH ROW
+EXECUTE FUNCTION fn_validar_y_procesar_pago();
+
+CREATE TRIGGER trg_validar_pago_criptomoneda
+BEFORE INSERT ON pago_criptomoneda
+FOR EACH ROW
+EXECUTE FUNCTION fn_validar_y_procesar_pago();
+
+CREATE TRIGGER trg_validar_pago_movil
+BEFORE INSERT ON pago_movil
+FOR EACH ROW
+EXECUTE FUNCTION fn_validar_y_procesar_pago();
+
+CREATE TRIGGER trg_validar_pago_tai
+BEFORE INSERT ON pago_tai 
+FOR EACH ROW
+EXECUTE FUNCTION fn_validar_y_procesar_pago();

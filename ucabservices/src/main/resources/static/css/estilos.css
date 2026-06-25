@@ -1,0 +1,125 @@
+:root {
+    --primary-color: #004B87; /* Azul UCAB */
+    --bg-color: #F4F6F9;
+    --card-bg: #FFFFFF;
+    --text-color: #333333;
+    --border-color: #E2E8F0;
+}
+
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background-color: var(--bg-color);
+    margin: 0;
+    padding: 0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    color: var(--text-color);
+}
+
+.container {
+    background-color: var(--card-bg);
+    padding: 40px;
+    border-radius: 12px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+    width: 100%;
+    max-width: 500px;
+}
+
+.container-wide {
+    max-width: 800px;
+}
+
+h2 {
+    color: var(--primary-color);
+    margin-top: 0;
+    margin-bottom: 24px;
+    font-weight: 600;
+    border-bottom: 2px solid var(--bg-color);
+    padding-bottom: 10px;
+}
+
+.grid-2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+}
+
+.form-group {
+    margin-bottom: 18px;
+    display: flex;
+    flex-direction: column;
+}
+
+label {
+    font-size: 14px;
+    font-weight: 500;
+    margin-bottom: 6px;
+    color: #555;
+}
+
+input, select {
+    padding: 10px 14px;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    font-size: 15px;
+    transition: all 0.3s;
+}
+
+input:focus, select:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 3px rgba(0, 75, 135, 0.1);
+}
+
+button {
+    background-color: var(--primary-color);
+    color: white;
+    padding: 12px;
+    border: none;
+    border-radius: 6px;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    width: 100%;
+    margin-top: 10px;
+    transition: background-color 0.2s;
+}
+
+button:hover {
+    background-color: #003663;
+}
+
+.alert {
+    padding: 12px;
+    border-radius: 6px;
+    margin-bottom: 20px;
+    font-size: 14px;
+    display: none;
+    font-weight: 500;
+}
+
+.alert-success {
+    background-color: #DEF7EC;
+    color: #03543F;
+    border: 1px solid #BCF0DA;
+}
+
+.alert-error {
+    background-color: #FDE8E8;
+    color: #9B1C1C;
+    border: 1px solid #FBD5D5;
+}
+
+.link-alt {
+    text-align: center;
+    margin-top: 20px;
+    font-size: 14px;
+}
+
+.link-alt a {
+    color: var(--primary-color);
+    text-decoration: none;
+    font-weight: 500;
+}

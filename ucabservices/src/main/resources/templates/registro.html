@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>UCAB-Services - Registro de Perfil</title>
+    <link rel="stylesheet" href="css/estilos.css">
+</head>
+<body>
+    <div class="container container-wide">
+        <h2>Registro de Perfil - UCAB-Services</h2>
+        <div id="alertBox" class="alert"></div>
+        
+        <form id="registroForm">
+            <div class="grid-2">
+                <div class="form-group">
+                    <label>Cédula de Identidad</label>
+                    <input type="text" id="cedula" required placeholder="Ej: V-12345678">
+                </div>
+                <div class="form-group">
+                    <label>Nombres Completos</label>
+                    <input type="text" id="nombres" required>
+                </div>
+                <div class="form-group">
+                    <label>Apellidos Completos</label>
+                    <input type="text" id="apellidos" required>
+                </div>
+                <div class="form-group">
+                    <label>Fecha de Nacimiento</label>
+                    <input type="date" id="fechaNacimiento" required>
+                </div>
+                <div class="form-group">
+                    <label>Género</label>
+                    <select id="genero" required>
+                        <option value="M">Masculino</option>
+                        <option value="F">Femenino</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Teléfono Personal</label>
+                    <input type="text" id="telefono" required placeholder="Ej: 04141234567">
+                </div>
+            </div>
+
+            <h3 style="color:#666; font-size:16px; margin: 20px 0 10px 0;">Dirección de Habitación</h3>
+            <div class="grid-2">
+                <div class="form-group">
+                    <label>Calle / Avenida</label>
+                    <input type="text" id="calle" required>
+                </div>
+                <div class="form-group">
+                    <label>Zona / Urbanización</label>
+                    <input type="text" id="zona" required>
+                </div>
+                <div class="form-group">
+                    <label>Ciudad</label>
+                    <input type="text" id="ciudad" required>
+                </div>
+            </div>
+
+            <h3 style="color:#666; font-size:16px; margin: 20px 0 10px 0;">Credenciales de Acceso</h3>
+            <div class="grid-2">
+                <div class="form-group">
+                    <label>Correo Institucional</label>
+                    <input type="email" id="correoInstitucional" required placeholder="usuario@ucab.edu.ve">
+                </div>
+                <div class="form-group">
+                    <label>Contraseña</label>
+                    <input type="password" id="contrasena" required minlength="4">
+                </div>
+            </div>
+
+            <button type="submit">Guardar Registro</button>
+        </form>
+        <div class="link-alt">
+            ¿Ya tienes cuenta? <a href="login.html">Inicia sesión aquí</a>
+        </div>
+    </div>
+
+    <script>
+        document.getElementById('registroForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const alertBox = document.getElementById('alertBox');
+            
+            // Construimos el JSON respetando la entidad exacta de Java
+            const payload = {
+                cedula: document.getElementById('cedula').value,
+                nombres: document.getElementById('nombres').value,
+                apellidos: document.getElementById('apellidos').value,
+                fechaNacimiento: document.getElementById('fechaNacimiento').value,
+                genero: document.getElementById('genero').value,
+                calle: document.getElementById('calle').value,
+                zona: document.getElementById('zona').value,
+                ciudad: document.getElementById('ciudad').value,
+                telefono: document.getElementById('telefono').value,
+                correoInstitucional: document.getElementById('correoInstitucional').value,
+                contrasena: document.getElementById('contrasena').value
+            };
+
+            try {
+                const response = await fetch('/api/auth/registro', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                
+                const data = await response.json();
+                alertBox.style.display = 'block';
+                
+                if (response.ok) {
+                    alertBox.className = 'alert alert-success';
+                    alertBox.innerText = "¡Usuario registrado exitosamente en la Base de Datos!";
+                    document.getElementById('registroForm').reset();
+                } else {
+                    alertBox.className = 'alert alert-error';
+                    alertBox.innerText = data.mensaje || "Error al registrar.";
+                }
+            } catch (err) {
+                alertBox.style.display = 'block';
+                alertBox.className = 'alert alert-error';
+                alertBox.innerText = "No se pudo conectar al backend de Spring Boot.";
+            }
+        });
+    </script>
+</body>
+</html>
