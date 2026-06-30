@@ -1,5 +1,6 @@
 package com.ucab.services.controller;
 
+import com.ucab.services.entities.Usuario;
 import com.ucab.services.services.AuthService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -12,6 +13,12 @@ import java.util.Map;
 public class AuthController {
 
     private final AuthService authService;
+
+    // --- Clase interna (DTO) para atrapar el JSON del Frontend ---
+    public static class RegistroRequest {
+        public Usuario usuario;
+        public String rolSeleccionado;
+    }
 
     public AuthController(AuthService authService) {
         this.authService = authService;
@@ -37,7 +44,12 @@ public class AuthController {
     }
 
     @PostMapping("/registro")
-    public ResponseEntity<?> registrarUsuario(@RequestBody com.ucab.services.entities.Usuario nuevoUsuario) {
-        return authService.registrarUsuario(nuevoUsuario);
+    public ResponseEntity<?> registrarUsuario(@RequestBody RegistroRequest request) {
+        try {
+            // Pasamos el usuario y el rol seleccionado al servicio
+            return authService.registrarUsuario(request.usuario, request.rolSeleccionado);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("status", "error", "mensaje", "Error al registrar: " + e.getMessage()));
+        }
     }
 }

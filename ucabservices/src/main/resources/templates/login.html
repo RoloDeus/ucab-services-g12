@@ -2,66 +2,85 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>UCAB-Services - Control de Acceso</title>
-    <link rel="stylesheet" href="css/estilos.css">
+    <title>UCAB-Services - Iniciar Sesión</title>
+    <link rel="stylesheet" href="css/estilos.css"> 
+    <style>
+        .container { max-width: 400px; margin: 50px auto; padding: 20px; font-family: sans-serif; }
+        .form-group { margin-bottom: 15px; }
+        .form-group label { display: block; margin-bottom: 5px; font-weight: bold; }
+        .form-group input { width: 100%; padding: 8px; box-sizing: border-box; }
+        .btn-primary { background-color: #0d6efd; color: white; border: none; padding: 10px; cursor: pointer; border-radius: 5px; font-weight: bold;}
+        .btn-primary:hover { background-color: #0b5ed7; }
+        .alert { padding: 10px; margin-bottom: 15px; border-radius: 5px; }
+        .alert-success { background-color: #d1e7dd; color: #0f5132; }
+        .alert-error { background-color: #f8d7da; color: #842029; }
+    </style>
 </head>
-<body>
-    <div class="container">
-        <div style="text-align: center; margin-bottom: 20px;">
-            <h2 style="margin-bottom: 5px;">UCAB - Services</h2>
-            <small style="color: #666; font-weight: 500;">Módulo de Autenticación Lógica</small>
-        </div>
+<body class="bg-light">
+    <div class="container shadow-sm bg-white rounded-4">
+        <h2 style="text-align: center; color: #0d6efd;">UCAB-Services</h2>
+        <h4 style="text-align: center; margin-bottom: 20px;">Iniciar Sesión</h4>
         
-        <div id="alertBox" class="alert"></div>
-
+        <div id="alertBox" class="alert" style="display: none;"></div>
+        
         <form id="loginForm">
             <div class="form-group">
                 <label>Correo Institucional</label>
-                <input type="email" id="correo" required placeholder="ejemplo@ucab.edu.ve">
+                <input type="email" id="correoLogin" required placeholder="usuario@est.ucab.edu.ve">
             </div>
             <div class="form-group">
                 <label>Contraseña</label>
-                <input type="password" id="contrasena" required>
+                <input type="password" id="contrasenaLogin" required>
             </div>
-            <button type="submit">Ingresar al Sistema</button>
+            
+            <button type="submit" class="btn-primary" style="width: 100%; margin-top: 10px;">Ingresar al Portal</button>
         </form>
         
-        <div class="link-alt">
-            ¿Eres un nuevo miembro? <a href="registro.html">Regístrate aquí</a>
-        </div>
+        <p style="text-align: center; margin-top: 20px; font-size: 14px;">
+            ¿No tienes cuenta? <a href="/registro" style="color: #0d6efd; font-weight: bold; text-decoration: none;">Regístrate aquí</a>
+        </p>
     </div>
 
     <script>
-        document.getElementById('loginForm').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const alertBox = document.getElementById('alertBox');
+        document.getElementById('loginForm').addEventListener('submit', async function(e) {
+            e.preventDefault(); // Evita que la página se recargue
             
-            const payload = {
-                correo: document.getElementById('correo').value,
-                contrasena: document.getElementById('contrasena').value
-            };
+            const alertBox = document.getElementById('alertBox');
+            alertBox.style.display = 'none';
+
+            const correo = document.getElementById('correoLogin').value;
+            const contrasena = document.getElementById('contrasenaLogin').value;
 
             try {
+                // Llamamos a tu backend de Spring Boot
                 const response = await fetch('/api/auth/login', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
+                    body: JSON.stringify({ correo: correo, contrasena: contrasena })
                 });
                 
                 const data = await response.json();
                 alertBox.style.display = 'block';
                 
-                if (response.ok && data.status === "success") {
+                // Si el backend responde que el login fue exitoso
+                if (response.ok && data.mensaje === 'Login Exitoso') {
                     alertBox.className = 'alert alert-success';
-                    alertBox.innerText = "🔓 " + data.mensaje + " (Procedimiento Almacenado Ejecutado en BD)";
+                    alertBox.innerText = "¡Credenciales correctas! Ingresando...";
+                    
+                    // AQUÍ ESTÁ EL CAMBIO: Redirección automática al panel enviando el correo en la URL
+                    setTimeout(() => {
+                        window.location.href = '/inicio?correo=' + encodeURIComponent(correo);
+                    }, 800);
+                    
                 } else {
+                    // Si la clave está mal o la cuenta bloqueada
                     alertBox.className = 'alert alert-error';
-                    alertBox.innerText = "❌ " + (data.mensaje || "Error de credenciales");
+                    alertBox.innerText = data.mensaje || "Credenciales inválidas.";
                 }
             } catch (err) {
                 alertBox.style.display = 'block';
                 alertBox.className = 'alert alert-error';
-                alertBox.innerText = "Error al conectar con Spring Boot.";
+                alertBox.innerText = "Error de conexión con el servidor.";
             }
         });
     </script>

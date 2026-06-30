@@ -8,7 +8,7 @@
 <body>
     <div class="container container-wide">
         <h2>Registro de Perfil - UCAB-Services</h2>
-        <div id="alertBox" class="alert"></div>
+        <div id="alertBox" class="alert" style="display: none;"></div>
         
         <form id="registroForm">
             <div class="grid-2">
@@ -36,64 +36,73 @@
                     </select>
                 </div>
                 <div class="form-group">
-                    <label>Teléfono Personal</label>
-                    <input type="text" id="telefono" required placeholder="Ej: 04141234567">
-                </div>
-            </div>
-
-            <h3 style="color:#666; font-size:16px; margin: 20px 0 10px 0;">Dirección de Habitación</h3>
-            <div class="grid-2">
-                <div class="form-group">
-                    <label>Calle / Avenida</label>
+                    <label>Calle/Avenida</label>
                     <input type="text" id="calle" required>
                 </div>
                 <div class="form-group">
-                    <label>Zona / Urbanización</label>
+                    <label>Zona/Urbanización</label>
                     <input type="text" id="zona" required>
                 </div>
                 <div class="form-group">
                     <label>Ciudad</label>
                     <input type="text" id="ciudad" required>
                 </div>
-            </div>
-
-            <h3 style="color:#666; font-size:16px; margin: 20px 0 10px 0;">Credenciales de Acceso</h3>
-            <div class="grid-2">
+                <div class="form-group">
+                    <label>Teléfono Móvil</label>
+                    <input type="tel" id="telefono" required placeholder="Ej: 04141234567">
+                </div>
                 <div class="form-group">
                     <label>Correo Institucional</label>
-                    <input type="email" id="correoInstitucional" required placeholder="usuario@ucab.edu.ve">
+                    <input type="email" id="correoInstitucional" required placeholder="usuario@est.ucab.edu.ve">
                 </div>
                 <div class="form-group">
                     <label>Contraseña</label>
-                    <input type="password" id="contrasena" required minlength="4">
+                    <input type="password" id="contrasena" required>
+                </div>
+                
+                <div class="form-group">
+                    <label>Rol Institucional (Vinculación)</label>
+                    <select id="rolSeleccionado" required>
+                        <option value="" disabled selected>Seleccione su rol de ingreso</option>
+                        <option value="Estudiante">Estudiante de Pregrado</option>
+                        <option value="Profesor">Personal Docente</option>
+                        <option value="Personal Administrativo">Personal Administrativo</option>
+                        <option value="Egresado">Egresado</option>
+                    </select>
                 </div>
             </div>
-
-            <button type="submit">Guardar Registro</button>
+            
+            <button type="submit" class="btn-primary" style="margin-top: 20px; width: 100%;">Registrar Miembro</button>
         </form>
-        <div class="link-alt">
-            ¿Ya tienes cuenta? <a href="login.html">Inicia sesión aquí</a>
-        </div>
+        
+        <p style="text-align: center; margin-top: 15px;">
+            ¿Ya eres miembro? <a href="/login" style="color: #004b87; font-weight: bold;">Ingresa aquí</a>
+        </p>
     </div>
 
     <script>
-        document.getElementById('registroForm').addEventListener('submit', async (e) => {
+        document.getElementById('registroForm').addEventListener('submit', async function(e) {
             e.preventDefault();
-            const alertBox = document.getElementById('alertBox');
             
-            // Construimos el JSON respetando la entidad exacta de Java
+            const alertBox = document.getElementById('alertBox');
+            alertBox.style.display = 'none';
+
+            // Armamos el payload con el DTO que espera el controlador
             const payload = {
-                cedula: document.getElementById('cedula').value,
-                nombres: document.getElementById('nombres').value,
-                apellidos: document.getElementById('apellidos').value,
-                fechaNacimiento: document.getElementById('fechaNacimiento').value,
-                genero: document.getElementById('genero').value,
-                calle: document.getElementById('calle').value,
-                zona: document.getElementById('zona').value,
-                ciudad: document.getElementById('ciudad').value,
-                telefono: document.getElementById('telefono').value,
-                correoInstitucional: document.getElementById('correoInstitucional').value,
-                contrasena: document.getElementById('contrasena').value
+                usuario: {
+                    cedula: document.getElementById('cedula').value,
+                    nombres: document.getElementById('nombres').value,
+                    apellidos: document.getElementById('apellidos').value,
+                    fechaNacimiento: document.getElementById('fechaNacimiento').value,
+                    genero: document.getElementById('genero').value,
+                    calle: document.getElementById('calle').value,
+                    zona: document.getElementById('zona').value,
+                    ciudad: document.getElementById('ciudad').value,
+                    telefono: document.getElementById('telefono').value,
+                    correoInstitucional: document.getElementById('correoInstitucional').value,
+                    contrasena: document.getElementById('contrasena').value
+                },
+                rolSeleccionado: document.getElementById('rolSeleccionado').value
             };
 
             try {
@@ -106,10 +115,15 @@
                 const data = await response.json();
                 alertBox.style.display = 'block';
                 
-                if (response.ok) {
+                if (data.status === 'success') {
                     alertBox.className = 'alert alert-success';
-                    alertBox.innerText = "¡Usuario registrado exitosamente en la Base de Datos!";
+                    alertBox.innerText = "¡Usuario registrado exitosamente! Redirigiendo al login...";
                     document.getElementById('registroForm').reset();
+                    
+                    // Redirección automática al login en 1.5 segundos
+                    setTimeout(() => {
+                        window.location.href = '/login';
+                    }, 1500);
                 } else {
                     alertBox.className = 'alert alert-error';
                     alertBox.innerText = data.mensaje || "Error al registrar.";

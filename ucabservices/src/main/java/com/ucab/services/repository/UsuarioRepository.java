@@ -7,6 +7,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
 import java.util.Optional;
 
 public interface UsuarioRepository extends JpaRepository<Usuario, Long> {
@@ -25,4 +26,6 @@ public interface UsuarioRepository extends JpaRepository<Usuario, Long> {
     @Transactional
     @Query(value = "UPDATE usuario SET conteo_intentos_fallidos = conteo_intentos_fallidos + 1 WHERE correo_institucional = :correo", nativeQuery = true)
     void incrementarIntentosFallidos(@Param("correo") String correo);
+
+    List<Usuario> findByEstadoCuentaIn(List<String> estados);
 }
