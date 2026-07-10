@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UCAB-Services | Panel de Auditoría</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .sortable-link { color: #212529; text-decoration: none; font-weight: bold; }
+        .text-truncate-custom { max-width: 250px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: inline-block; }
+    </style>
+</head>
+<body class="bg-light">
+
+    <nav class="navbar navbar-dark bg-dark shadow-sm">
+        <div class="container-fluid px-4">
+            <a class="navbar-brand fw-bold" href="#">UCAB-Services | Panel de Auditoría y Seguridad</a>
+            <div class="d-flex align-items-center">
+                <span class="badge bg-danger text-white me-3">Acceso Restringido: Ciberseguridad</span>
+                <a th:href="@{/inicio(correo=${correo})}" class="btn btn-sm btn-outline-light">Volver al Inicio</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container-fluid px-4 mt-4 mb-5">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <div>
+                <h3 class="fw-bold m-0">Monitoreo de Sesiones Globales</h3>
+                <p class="text-muted small m-0">Trazabilidad de accesos, credenciales y dispositivos de la red UCAB.</p>
+            </div>
+        </div>
+
+        <div class="card shadow-sm border-0 rounded-4">
+            <div class="card-body p-0">
+                <table class="table table-hover mb-0 align-middle">
+                    <thead class="table-light">
+                        <tr>
+                            <th class="px-4 py-3">Usuario (Titular)</th>
+                            <th class="px-4 py-3">
+                                <a class="sortable-link" th:href="@{/admin/auditoria/sesiones(correo=${correo}, page=${currentPage}, sortField='fechaHoraAcceso', sortDir=${reverseSortDir})}">
+                                    Fecha y Hora Exacta <span th:if="${sortField == 'fechaHoraAcceso'}" th:text="${sortDir == 'asc' ? '↑' : '↓'}"></span>
+                                </a>
+                            </th>
+                            <th class="px-4 py-3">Dirección IP</th>
+                            <th class="px-4 py-3">Dispositivo y Red (User-Agent)</th>
+                            <th class="px-4 py-3">Estatus de Cuenta</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr th:each="sesion : ${pagina.content}">
+                            <td class="px-4 py-3">
+                                <div class="fw-bold text-primary" th:text="${sesion.usuario.correoInstitucional}">correo@ucab.edu.ve</div>
+                                <div class="small text-muted" th:text="'C.I: ' + ${sesion.usuario.cedula}">C.I</div>
+                            </td>
+                            <td class="px-4 py-3 fw-medium" th:text="${#temporals.format(sesion.fechaHoraAcceso, 'dd/MM/yyyy - hh:mm a')}">Fecha</td>
+                            <td class="px-4 py-3">
+                                <span class="badge bg-secondary" th:text="${sesion.direccionIp}">192.168...</span>
+                                <div class="small text-muted mt-1" th:text="${sesion.geolocalizacionAproximada}">Caracas</div>
+                            </td>
+                            <td class="px-4 py-3">
+                                <span class="text-truncate-custom small text-muted" th:title="${sesion.uuidDispositivo}" th:text="${sesion.uuidDispositivo}">Mozilla/5.0...</span>
+                            </td>
+                            <td class="px-4 py-3">
+                                <span class="badge" th:classappend="${sesion.usuario.estadoCuenta == 'Activa'} ? 'bg-success' : 'bg-danger'" th:text="${sesion.usuario.estadoCuenta}"></span>
+                                <div class="small text-danger mt-1" th:if="${sesion.usuario.conteoIntentosFallidos > 0}" th:text="${sesion.usuario.conteoIntentosFallidos} + ' Intentos Fallidos'"></div>
+                            </td>
+                        </tr>
+                        <tr th:if="${pagina.empty}">
+                            <td colspan="5" class="text-center py-4 text-muted">Aún no se registran inicios de sesión en el sistema.</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="card-footer bg-white border-0 py-3 d-flex justify-content-between align-items-center" th:if="${pagina.totalPages > 1}">
+                <small class="text-muted" th:text="'Página ' + (${currentPage} + 1) + ' de ' + ${pagina.totalPages}"></small>
+                <ul class="pagination pagination-sm mb-0">
+                    <li class="page-item" th:classappend="${currentPage == 0} ? 'disabled'">
+                        <a class="page-link" th:href="@{/admin/auditoria/sesiones(correo=${correo}, page=${currentPage - 1}, sortField=${sortField}, sortDir=${sortDir})}">Anterior</a>
+                    </li>
+                    <li class="page-item" th:each="i : ${#numbers.sequence(0, pagina.totalPages - 1)}" th:classappend="${currentPage == i} ? 'active'">
+                        <a class="page-link" th:href="@{/admin/auditoria/sesiones(correo=${correo}, page=${i}, sortField=${sortField}, sortDir=${sortDir})}" th:text="${i + 1}">1</a>
+                    </li>
+                    <li class="page-item" th:classappend="${currentPage == pagina.totalPages - 1} ? 'disabled'">
+                        <a class="page-link" th:href="@{/admin/auditoria/sesiones(correo=${correo}, page=${currentPage + 1}, sortField=${sortField}, sortDir=${sortDir})}">Siguiente</a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

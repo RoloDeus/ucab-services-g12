@@ -28,18 +28,18 @@ public class BeneficiarioFamiliar {
     private LocalDate fechaNacimiento;
 
     @Column(name = "esquema_vacunacion", length = 20)
-    private String esquemaVacunacion;
+    private String esquemaVacunacion = "No Aplica";
 
     @Column(name = "centro_educacion_inicial", length = 20)
-    private String centroEducacionInicial;
+    private String centroEducacionInicial = "No Aplica";
 
     @Column(name = "constancia_estudios_universitarios", length = 20)
-    private String constanciaEstudiosUniversitarios;
+    private String constanciaEstudiosUniversitarios = "No Aplica";
 
     @Column(name = "certificado_solteria", length = 20)
-    private String certificadoSolteria;
+    private String certificadoSolteria = "No Aplica";
 
-    // Getters y Setters
+    // --- Getters y Setters ---
     public Long getCiFamiliar() { return ciFamiliar; }
     public void setCiFamiliar(Long ciFamiliar) { this.ciFamiliar = ciFamiliar; }
 

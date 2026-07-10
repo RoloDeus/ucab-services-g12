@@ -1,11 +1,9 @@
 package com.ucab.services.services;
 
 import com.ucab.services.entities.Estudiante;
-import com.ucab.services.entities.Preparaduria;
 import com.ucab.services.entities.Usuario;
 import com.ucab.services.repository.EstudianteRepository;
 import com.ucab.services.repository.UsuarioRepository;
-import com.ucab.services.repository.PreparaduriaRepository;
 import com.ucab.services.repository.ProfesorRepository;
 import com.ucab.services.entities.Profesor;
 
@@ -21,14 +19,12 @@ public class TrayectoriaService {
 
     private final UsuarioRepository usuarioRepository;
     private final EstudianteRepository estudianteRepository;
-    private final PreparaduriaRepository preparaduriaRepository;
     private final ProfesorRepository profesorRepository;
 
     public TrayectoriaService(UsuarioRepository usuarioRepository, EstudianteRepository estudianteRepository,
-                              PreparaduriaRepository preparaduriaRepository, ProfesorRepository profesorRepository) {
+                              ProfesorRepository profesorRepository) {
         this.usuarioRepository = usuarioRepository;
         this.estudianteRepository = estudianteRepository;
-        this.preparaduriaRepository = preparaduriaRepository;
         this.profesorRepository = profesorRepository;
     }
 

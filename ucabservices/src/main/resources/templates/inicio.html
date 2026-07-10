@@ -60,7 +60,7 @@
                         <div class="module-icon">👨‍👩‍👧‍👦</div>
                         <h5 class="fw-bold">Carga Familiar</h5>
                         <p class="text-muted small">Registra beneficiarios, valida mayoría de edad y gestiona coberturas.</p>
-                        <a href="#" class="btn btn-outline-info w-100 mt-2 text-dark">Gestionar Familiares</a>
+                        <a th:href="@{/perfil/carga-familiar(correo=${correo})}" class="btn btn-outline-info w-100 mt-2 text-dark">Gestionar Familiares</a>
                     </div>
                 </div>
             </div>
@@ -87,13 +87,25 @@
                 </div>
             </div>
 
-            <div class="col-md-4">
+            <div class="col-md-4" th:if="${esAdmin}">
                 <div class="card h-100 border-0 rounded-4 p-3 text-center hover-card shadow-sm border-bottom border-warning border-4">
                     <div class="card-body">
                         <div class="module-icon">🏢</div>
                         <h5 class="fw-bold">Infraestructura y Reservas</h5>
                         <p class="text-muted small">Consulta disponibilidad y reserva espacios en Montalbán o Guayana.</p>
-                        <a href="#" class="btn btn-outline-warning text-dark w-100 mt-2">Reservar Espacio</a>
+                        <a th:href="@{/admin/infraestructura(correo=${correo})}" class="btn btn-outline-dark w-100 mt-2">Gestión de Infraestructura (Admin)</a>
+                        <a th:href="@{/admin/jerarquia(correo=${correo})}" class="btn btn-outline-success text-dark w-100 mt-2">Jerarquía y Sedes (Admin)</a>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-4">
+                <div class="card h-100 border-0 rounded-4 p-3 text-center hover-card shadow-sm border-bottom border-warning border-4">
+                    <div class="card-body">
+                        <div class="module-icon">👥</div>
+                        <h5 class="fw-bold">Acompañantes Temporales</h5>
+                        <p class="text-muted small">Registra a las personas que te acompañarán en tus reservas.</p>
+                        <a th:href="@{/perfil/acompanantes(correo=${correo})}" class="btn btn-outline-warning text-dark w-100 mt-2">Registrar Acompañantes</a>
                     </div>
                 </div>
             </div>
@@ -105,6 +117,17 @@
                         <h5 class="fw-bold">Oportunidades Laborales</h5>
                         <p class="text-muted small">Accede a vacantes exclusivas de nuestros Aliados Externos.</p>
                         <a href="#" class="btn btn-outline-danger w-100 mt-2">Ver Bolsa de Trabajo</a>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-4" th:if="${esAdmin}">
+                <div class="card h-100 border-0 rounded-4 p-3 text-center hover-card shadow-sm border-bottom border-warning border-4">
+                    <div class="card-body">
+                        <div class="module-icon">🔒</div>
+                        <h5 class="fw-bold">Historial de Sesiones</h5>
+                        <p class="text-muted small">Consulta el historial de inicios de sesión en el sistema.</p>
+                        <a th:href="@{/admin/auditoria/sesiones(correo=${correo})}" class="btn btn-outline-danger w-100 mt-2 text-dark">Monitoreo de Ciberseguridad</a>
                     </div>
                 </div>
             </div>

@@ -28,4 +28,5 @@ public interface UsuarioRepository extends JpaRepository<Usuario, Long> {
     void incrementarIntentosFallidos(@Param("correo") String correo);
 
     List<Usuario> findByEstadoCuentaIn(List<String> estados);
+
 }
