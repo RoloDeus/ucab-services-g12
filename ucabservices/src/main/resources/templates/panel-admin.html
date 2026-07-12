@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UCAB-Services | Panel de Administración</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body class="bg-light">
+
+    <!-- Navegación Superior -->
+    <nav class="navbar navbar-dark bg-dark">
+        <div class="container">
+            <a class="navbar-brand fw-bold" href="#">UCAB-Services | Control Administrativo</a>
+            <div class="d-flex align-items-center">
+                <span class="badge bg-warning text-dark me-3">Módulo de Secretaría</span>
+                <a th:href="@{/inicio(correo=${admin.correoInstitucional})}" class="btn btn-sm btn-outline-light">Volver al Inicio</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        <div class="row g-4">
+            
+            <!-- SECCIÓN 1: CONTROL DE CUENTAS DE SEGURIDAD -->
+            <div class="col-md-12">
+                <div class="card shadow-sm border-0 rounded-4">
+                    <div class="card-header bg-danger text-white fw-bold py-3 rounded-top-4">
+                        Control de Seguridad: Cuentas Restringidas
+                    </div>
+                    <div class="card-body">
+                        <table class="table table-hover align-middle">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Cédula</th>
+                                    <th>Usuario</th>
+                                    <th>Estatus Actual</th>
+                                    <th>Acción Correctiva</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr th:each="u : ${cuentasInactivas}">
+                                    <td th:text="${u.cedula}">C.I</td>
+                                    <td th:text="${u.nombres} + ' ' + ${u.apellidos}">Nombre</td>
+                                    <td><span class="badge bg-danger" th:text="${u.estadoCuenta}">Bloqueada</span></td>
+                                    <td>
+                                        <!-- Botón que ejecuta el desbloqueo -->
+                                        <form th:action="@{/admin/activar-cuenta}" method="post">
+                                            <input type="hidden" name="idUsuario" th:value="${u.idUsuario}">
+                                            <input type="hidden" name="correoAdmin" th:value="${admin.correoInstitucional}">
+                                            <button type="submit" class="btn btn-sm btn-success fw-bold">Reactivar Cuenta</button>
+                                        </form>
+                                    </td>
+                                </tr>
+                                <tr th:if="${cuentasInactivas.empty}">
+                                    <td colspan="4" class="text-center text-muted py-3">No hay cuentas bloqueadas o suspendidas actualmente.</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- SECCIÓN 2: ACTUALIZACIÓN DE EXPEDIENTES Y BENEFICIOS -->
+            <div class="col-md-12">
+                <div class="card shadow-sm border-0 rounded-4 mb-5">
+                    <div class="card-header bg-primary text-white fw-bold py-3 rounded-top-4">
+                        Gestión Académica: Notas, Becas y Tutorías
+                    </div>
+                    <div class="card-body p-4">
+                        <form th:action="@{/admin/actualizar-estudiante}" method="post" class="row g-3">
+                            <input type="hidden" name="correoAdmin" th:value="${admin.correoInstitucional}">
+                            
+                            <div class="col-md-12">
+                                <label class="fw-bold mb-2">Seleccione el Estudiante a Modificar:</label>
+                                <select class="form-select" name="idUsuario" required>
+                                    <option value="" disabled selected>Buscar en la base de datos...</option>
+                                    <option th:each="est : ${estudiantes}" th:value="${est.usuario.idUsuario}" th:text="${est.usuario.cedula} + ' - ' + ${est.usuario.nombres} + ' ' + ${est.usuario.apellidos}"></option>
+                                </select>
+                            </div>
+
+                            <div class="col-md-6 mt-4">
+                                <label class="text-muted small">Facultad de Adscripción</label>
+                                <select class="form-select" name="facultad" id="facultadSelect" required>
+                                    <option value="" disabled selected>Seleccione una Facultad</option>
+                                    </select>
+                            </div>
+
+                            <div class="col-md-6 mt-4">
+                                <label class="text-muted small">Escuela / Carrera</label>
+                                <select class="form-select" name="escuela" id="escuelaSelect" required>
+                                    <option value="" disabled selected>Seleccione primero la Facultad</option>
+                                </select>
+                            </div>
+
+                            <div class="col-md-4 mt-4">
+                                <label class="text-muted small">Promedio Ponderado</label>
+                                <input type="number" step="0.01" max="20" class="form-control" name="promedio" placeholder="Ej: 16.50" required>
+                            </div>
+                            <div class="col-md-4 mt-4">
+                                <label class="text-muted small">UC Aprobadas</label>
+                                <input type="number" class="form-control" name="uc" placeholder="Ej: 85" required>
+                            </div>
+                            <div class="col-md-4 mt-4">
+                                <label class="text-muted small">Semestre Actual</label>
+                                <input type="number" class="form-control" name="semestre" placeholder="Ej: 6" required>
+                            </div>
+
+                            <div class="col-md-6 mt-4">
+                                <label class="text-muted small">Asignación de Beca</label>
+                                <select class="form-select" name="tipoBeca">
+                                    <option value="Ninguna">Ninguna (Sin beneficio)</option>
+                                    <option value="Excelencia">Beca Excelencia</option>
+                                    <option value="Ayuda Económica">Beca Ayuda Económica</option>
+                                    <option value="Comedor">Beca Comedor</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6 mt-4">
+                                <label class="text-muted small">Asignar Tutoría / Preparaduría (Opcional)</label>
+                                <input type="text" class="form-control" name="preparaduria" placeholder="Ej: Algoritmos y Programación">
+                            </div>
+
+                            <div class="col-12 mt-4 text-end">
+                                <button type="submit" class="btn btn-primary px-4 fw-bold">Guardar Cambios en Expediente</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+    <script>
+        // Envolvemos todo para asegurar que el HTML cargue primero
+        document.addEventListener('DOMContentLoaded', function() {
+            
+            // Diccionario con la estructura real de la universidad
+            const ucabData = {
+                "Ingeniería": ["Ingeniería Informática", "Ingeniería Civil", "Ingeniería Industrial", "Ingeniería de Telecomunicaciones"],
+                "Ciencias Económicas y Sociales": ["Administración de Empresas", "Contaduría Pública", "Economía", "Relaciones Industriales", "Sociología"],
+                "Humanidades y Educación": ["Comunicación Social", "Educación", "Filosofía", "Letras", "Psicología"],
+                "Derecho": ["Derecho"],
+                "Arquitectura y Urbanismo": ["Arquitectura"],
+                "Teología": ["Teología"]
+            };
+
+            const facultadSelect = document.getElementById('facultadSelect');
+            const escuelaSelect = document.getElementById('escuelaSelect');
+
+            // Verificamos que los elementos existan para evitar errores invisibles
+            if (facultadSelect && escuelaSelect) {
+                
+                // 1. Llenamos el primer select con las Facultades
+                for (let facultad in ucabData) {
+                    let option = document.createElement('option');
+                    option.value = facultad;
+                    option.text = facultad;
+                    facultadSelect.appendChild(option);
+                }
+
+                // 2. Escuchamos el cambio para llenar el segundo select con las Escuelas
+                facultadSelect.addEventListener('change', function() {
+                    let escuelas = ucabData[this.value];
+                    
+                    // Limpiamos las opciones anteriores
+                    escuelaSelect.innerHTML = '<option value="" disabled selected>Seleccione la Escuela</option>';
+                    
+                    // Agregamos las nuevas escuelas
+                    if (escuelas) {
+                        escuelas.forEach(function(escuela) {
+                            let option = document.createElement('option');
+                            option.value = escuela;
+                            option.text = escuela;
+                            escuelaSelect.appendChild(option);
+                        });
+                    }
+                });
+                
+            } else {
+                console.error("No se encontraron los menús desplegables en el HTML.");
+            }
+        });
+    </script>
+</body>
+</html>

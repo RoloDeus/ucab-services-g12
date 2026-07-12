@@ -4,6 +4,7 @@ import com.ucab.services.entities.Usuario;
 import com.ucab.services.repository.UsuarioRepository;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Optional;
 import java.util.Map;
@@ -12,9 +13,11 @@ import java.util.Map;
 public class AuthService {
 
     private final UsuarioRepository usuarioRepository;
+    private final TrayectoriaService trayectoriaService;
 
-    public AuthService(UsuarioRepository usuarioRepository) {
+    public AuthService(UsuarioRepository usuarioRepository, TrayectoriaService trayectoriaService) {
         this.usuarioRepository = usuarioRepository;
+        this.trayectoriaService = trayectoriaService;
     }
 
     public String login(String correo, String contrasena) {
@@ -53,28 +56,47 @@ public class AuthService {
     }
 
     // Lógica para Registro de Nuevos Miembros (HU-01)
-    public ResponseEntity<?> registrarUsuario(Usuario nuevoUsuario) {
+    @Transactional
+    public ResponseEntity<?> registrarUsuario(Usuario nuevoUsuario, String rolSeleccionado) {
         try {
-            // Validaciones iniciales básicas del negocio
             if (usuarioRepository.findByCorreoInstitucional(nuevoUsuario.getCorreoInstitucional()).isPresent()) {
-                return ResponseEntity.badRequest().body(Map.of("mensaje", "El correo institucional ya se encuentra en uso."));
+                return ResponseEntity.badRequest().body(Map.of("mensaje", "El correo ya está en uso."));
             }
             
-            // Inicialización de estados por defecto de acuerdo a las restricciones de la BD
+            // 1. Valores por defecto para el usuario
             nuevoUsuario.setEstadoCuenta("Activa");
             nuevoUsuario.setConteoIntentosFallidos(0);
             nuevoUsuario.setIndiceRecurrencia(0);
             nuevoUsuario.setCategoriaFidelidad("Regular");
             nuevoUsuario.setEstatusVerificacionDosPasos(false);
 
+            // 2. Guardamos el registro base en la tabla 'usuario'
             Usuario guardado = usuarioRepository.save(nuevoUsuario);
-            return ResponseEntity.ok(Map.of(
-                "status", "success", 
-                "mensaje", "Usuario registrado con éxito", 
-                "id", guardado.getIdUsuario()
-            ));
+
+            // 3. Evaluamos y asignamos el Periodo de Vinculación y Herencia
+            if (rolSeleccionado != null) {
+                switch (rolSeleccionado) {
+                    case "Estudiante":
+                        trayectoriaService.asignarRolEstudiantePrueba(guardado.getCorreoInstitucional());
+                        break;
+                    case "Profesor":
+                        trayectoriaService.asignarRolProfesorPrueba(guardado.getCorreoInstitucional());
+                        break;
+                    case "Personal Administrativo":
+                        // trayectoriaService.asignarRolAdministrativoPrueba(guardado.getCorreoInstitucional());
+                        break;
+                    case "Egresado":
+                        // trayectoriaService.asignarRolEgresadoPrueba(guardado.getCorreoInstitucional());
+                        break;
+                    default:
+                        // Si mandan un rol que no existe en tu BD, se ignora o puedes lanzar un error
+                        break;
+                }
+            }
+
+            return ResponseEntity.ok(Map.of("status", "success", "mensaje", "Registrado exitosamente"));
         } catch (Exception e) {
-            return ResponseEntity.status(500).body(Map.of("mensaje", "Error en el servidor al registrar: " + e.getMessage()));
+            return ResponseEntity.status(500).body(Map.of("mensaje", "Error: " + e.getMessage()));
         }
     }
 }
