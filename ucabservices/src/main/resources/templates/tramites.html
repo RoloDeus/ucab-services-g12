@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Avance de Trámite</title>
+<style>
+  body { font-family: Arial, sans-serif; max-width: 800px; margin: 40px auto; padding: 0 20px; }
+  h1 { font-size: 20px; }
+  table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+  th, td { border: 1px solid #ccc; padding: 8px; text-align: left; font-size: 14px; }
+  button { padding: 6px 12px; background: #222; color: white; border: none; cursor: pointer; }
+  button:disabled { background: #aaa; cursor: default; }
+  #mensaje { margin-top: 16px; padding: 10px; border-radius: 4px; display: none; }
+  #mensaje.ok { background: #d4edda; color: #155724; display: block; }
+  #mensaje.error { background: #f8d7da; color: #721c24; display: block; }
+  .completado { color: #155724; font-weight: bold; }
+  .pendiente { color: #856404; }
+</style>
+</head>
+<body>
+ 
+<h1>Avance de Trámite</h1>
+<p>Pasos de todos los trámites. Al completar un paso, la hora de finalización se graba sola.</p>
+ 
+<div id="mensaje"></div>
+ 
+<table id="tablaPasos">
+  <thead>
+    <tr>
+      <th>Solicitud</th><th>Titular</th><th>Paso</th><th>Oficina</th>
+      <th>Estado</th><th>Finalización</th><th></th>
+    </tr>
+  </thead>
+  <tbody></tbody>
+</table>
+ 
+<script>
+// Convierte el formato crudo (2026-07-10T23:59:42.681+00:00) a algo legible.
+function formatearFecha(iso) {
+  if (!iso) return '—';
+  const fecha = new Date(iso);
+  return fecha.toLocaleString('es-VE', {
+    day: '2-digit', month: '2-digit', year: 'numeric',
+    hour: '2-digit', minute: '2-digit'
+  });
+}
+ 
+async function cargarPasos() {
+  const res = await fetch('/api/tramites/pasos');
+  const datos = await res.json();
+  const tbody = document.querySelector('#tablaPasos tbody');
+  tbody.innerHTML = '';
+ 
+  datos.forEach(p => {
+    const completado = p.estado_paso === 'Completado';
+    const fila = document.createElement('tr');
+    fila.innerHTML = `
+      <td>${p.id_solicitud}</td>
+      <td>${p.titular}</td>
+      <td>${p.secuencia_paso}</td>
+      <td>${p.oficina_responsable}</td>
+      <td class="${completado ? 'completado' : 'pendiente'}">${p.estado_paso}</td>
+      <td>${formatearFecha(p.fecha_hora_finalizacion_exacta)}</td>
+      <td>
+        <button ${completado ? 'disabled' : ''}
+                onclick="completarPaso(${p.id_solicitud}, ${p.id_usuario}, ${p.secuencia_paso})">
+          ${completado ? 'Listo' : 'Completar'}
+        </button>
+      </td>`;
+    tbody.appendChild(fila);
+  });
+}
+ 
+async function completarPaso(idSolicitud, idUsuario, secuenciaPaso) {
+  const res = await fetch('/api/tramites/completar', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ idSolicitud, idUsuario, secuenciaPaso })
+  });
+  const resultado = await res.json();
+  const mensajeDiv = document.getElementById('mensaje');
+ 
+  if (res.ok) {
+    mensajeDiv.className = 'ok';
+    mensajeDiv.textContent = resultado.mensaje;
+    cargarPasos();
+  } else {
+    mensajeDiv.className = 'error';
+    mensajeDiv.textContent = resultado.error;
+  }
+}
+ 
+cargarPasos();
+</script>
+ 
+</body>
+</html>
+ 

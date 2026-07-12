@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Registrar Pago</title>
+<style>
+  body { font-family: Arial, sans-serif; max-width: 700px; margin: 40px auto; padding: 0 20px; }
+  h1 { font-size: 20px; }
+  label { display: block; margin-top: 12px; font-weight: bold; }
+  input, select { width: 100%; padding: 8px; margin-top: 4px; box-sizing: border-box; }
+  button { margin-top: 20px; padding: 10px 20px; background: #222; color: white; border: none; cursor: pointer; }
+  #mensaje { margin-top: 16px; padding: 10px; border-radius: 4px; display: none; }
+  #mensaje.ok { background: #d4edda; color: #155724; display: block; }
+  #mensaje.error { background: #f8d7da; color: #721c24; display: block; }
+  #saldoInfo { font-size: 13px; color: #555; margin-top: 4px; }
+  table { width: 100%; margin-top: 30px; border-collapse: collapse; }
+  th, td { border: 1px solid #ccc; padding: 8px; text-align: left; font-size: 14px; }
+</style>
+</head>
+<body>
+ 
+<h1>Registrar Pago</h1>
+ 
+<form id="formPago">
+  <label>Factura</label>
+  <select id="factura" required></select>
+  <p id="saldoInfo"></p>
+ 
+  <label>Método de pago</label>
+  <select id="metodo" required>
+    <option value="zelle">Zelle</option>
+    <option value="tarjeta">Tarjeta</option>
+  </select>
+ 
+  <label>Monto a pagar (USD)</label>
+  <input type="number" step="0.01" id="monto" required>
+ 
+  <div id="camposZelle">
+    <label>Correo de origen</label>
+    <input type="text" id="correoOrigen">
+    <label>Nombre del titular</label>
+    <input type="text" id="nombreTitular">
+    <label>Código de confirmación</label>
+    <input type="text" id="codigoConfirmacion">
+  </div>
+ 
+  <div id="camposTarjeta" style="display:none;">
+    <label>Número de tarjeta (últimos 4 dígitos)</label>
+    <input type="text" id="numeroTarjeta">
+    <label>Fecha de vencimiento (MM/AA)</label>
+    <input type="text" id="fechaVencimiento">
+    <label>Tipo de red</label>
+    <input type="text" id="tipoRed">
+    <label>Compañía emisora</label>
+    <input type="text" id="companiaEmisora">
+  </div>
+ 
+  <button type="submit">Registrar Pago</button>
+</form>
+ 
+<div id="mensaje"></div>
+ 
+<h2>Facturas pendientes</h2>
+<table id="tablaFacturas">
+  <thead><tr><th>Número control</th><th>Titular</th><th>Saldo pendiente</th></tr></thead>
+  <tbody></tbody>
+</table>
+ 
+<script>
+let facturasCache = [];
+ 
+async function cargarFacturas() {
+  const res = await fetch('/api/pagos/facturas-pendientes');
+  facturasCache = await res.json();
+ 
+  const select = document.getElementById('factura');
+  select.innerHTML = '';
+  facturasCache.forEach(f => {
+    const opt = document.createElement('option');
+    opt.value = f.numero_control;
+    opt.textContent = `${f.numero_control} — ${f.titular} (saldo: $${f.saldo_factura})`;
+    select.appendChild(opt);
+  });
+ 
+  const tbody = document.querySelector('#tablaFacturas tbody');
+  tbody.innerHTML = '';
+  facturasCache.forEach(f => {
+    const fila = document.createElement('tr');
+    fila.innerHTML = `<td>${f.numero_control}</td><td>${f.titular}</td><td>$${f.saldo_factura}</td>`;
+    tbody.appendChild(fila);
+  });
+ 
+  actualizarSaldoInfo();
+}
+ 
+function actualizarSaldoInfo() {
+  const numeroControl = document.getElementById('factura').value;
+  const factura = facturasCache.find(f => f.numero_control === numeroControl);
+  document.getElementById('saldoInfo').textContent = factura
+    ? `Saldo pendiente: $${factura.saldo_factura}`
+    : '';
+}
+ 
+document.getElementById('factura').addEventListener('change', actualizarSaldoInfo);
+ 
+document.getElementById('metodo').addEventListener('change', (e) => {
+  const esZelle = e.target.value === 'zelle';
+  document.getElementById('camposZelle').style.display = esZelle ? 'block' : 'none';
+  document.getElementById('camposTarjeta').style.display = esZelle ? 'none' : 'block';
+});
+ 
+document.getElementById('formPago').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const numeroControl = document.getElementById('factura').value;
+  const factura = facturasCache.find(f => f.numero_control === numeroControl);
+ 
+  const cuerpo = {
+    metodo: document.getElementById('metodo').value,
+    numeroControlFactura: numeroControl,
+    idUsuario: factura ? factura.id_usuario : null,
+    monto: Number(document.getElementById('monto').value),
+    correoOrigen: document.getElementById('correoOrigen').value,
+    nombreTitular: document.getElementById('nombreTitular').value,
+    codigoConfirmacion: document.getElementById('codigoConfirmacion').value,
+    numeroTarjeta: document.getElementById('numeroTarjeta').value,
+    fechaVencimiento: document.getElementById('fechaVencimiento').value,
+    tipoRed: document.getElementById('tipoRed').value,
+    companiaEmisora: document.getElementById('companiaEmisora').value
+  };
+ 
+  const res = await fetch('/api/pagos', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(cuerpo)
+  });
+  const resultado = await res.json();
+  const mensajeDiv = document.getElementById('mensaje');
+ 
+  if (res.ok) {
+    mensajeDiv.className = 'ok';
+    mensajeDiv.textContent = resultado.mensaje;
+    document.getElementById('formPago').reset();
+    cargarFacturas();
+  } else {
+    mensajeDiv.className = 'error';
+    mensajeDiv.textContent = resultado.error;
+  }
+});
+ 
+cargarFacturas();
+</script>
+ 
+</body>
+</html>
+ 
