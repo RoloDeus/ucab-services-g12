@@ -22,6 +22,14 @@ import org.springframework.data.domain.Sort;
 import com.ucab.services.entities.Beca;
 import com.ucab.services.repository.BecaRepository;
 
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.transaction.annotation.Transactional;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
+
+import com.ucab.services.entities.CursoSeccion;
+import com.ucab.services.repository.CursoSeccionRepository;
+
 import java.util.List;
 import java.util.Optional;
 
@@ -35,14 +43,16 @@ public class PerfilController {
     private final BecaRepository becaRepository;
     private final PeriodoVinculacionRepository periodoVinculacionRepository;
     private final ProfesorRepository profesorRepository;
+    private final CursoSeccionRepository cursoSeccionRepository;
 
-    public PerfilController(UsuarioRepository usuarioRepository, EstudianteRepository estudianteRepository, PreparaduriaRepository preparaduriaRepository, BecaRepository becaRepository, PeriodoVinculacionRepository periodoVinculacionRepository, ProfesorRepository profesorRepository) {
+    public PerfilController(UsuarioRepository usuarioRepository, EstudianteRepository estudianteRepository, PreparaduriaRepository preparaduriaRepository, BecaRepository becaRepository, PeriodoVinculacionRepository periodoVinculacionRepository, ProfesorRepository profesorRepository, CursoSeccionRepository cursoSeccionRepository) {
         this.usuarioRepository = usuarioRepository;
         this.estudianteRepository = estudianteRepository;
         this.preparaduriaRepository = preparaduriaRepository;
         this.becaRepository = becaRepository;
         this.periodoVinculacionRepository = periodoVinculacionRepository;
         this.profesorRepository = profesorRepository;
+        this.cursoSeccionRepository = cursoSeccionRepository;
     }
 
     // Endpoint: localhost:8080/perfil/academico?correo=tu_correo
@@ -75,6 +85,10 @@ public class PerfilController {
             if (!becas.isEmpty()) {
                 model.addAttribute("beca", becas.get(0));
             }
+
+            // NUEVO: Buscamos la carga académica (Materias inscritas)
+            List<CursoSeccion> materiasInscritas = cursoSeccionRepository.findCursosInscritosPorEstudiante(usuario.getIdUsuario());
+            model.addAttribute("materiasInscritas", materiasInscritas);
         }
 
         return "ficha-academica"; 
@@ -141,6 +155,28 @@ public class PerfilController {
         return "redirect:/login";
     }
 
+    // HU-13: SOLICITUD DE BECA DINÁMICA
+    @PostMapping("/beca/solicitar")
+    public String solicitarBeca(
+            @RequestParam String correo,
+            @RequestParam String cedula,
+            @RequestParam String tipoBeca) {
+        
+        try {
+            // Llamamos a la base de datos. Si el promedio no da, PostgreSQL lanzará un error aquí.
+            usuarioRepository.solicitarBeca(cedula, tipoBeca);
+            
+            // Si pasa esta línea, significa que la BD aprobó la beca
+            String msjExito = "¡Felicidades! El sistema ha evaluado tu promedio y la beca ha sido aprobada y asignada.";
+            return "redirect:/perfil/academico?correo=" + correo + "&exito=" + URLEncoder.encode(msjExito, StandardCharsets.UTF_8);
+            
+        } catch (Exception e) {
+            // Si PostgreSQL rechaza la solicitud (RAISE EXCEPTION), caemos aquí
+            String msjError = "Solicitud rechazada por el sistema. No cumples con el índice académico exigido o ya posees una beca activa.";
+            return "redirect:/perfil/academico?correo=" + correo + "&error=" + URLEncoder.encode(msjError, StandardCharsets.UTF_8);
+        }
+    }
+
     // HU-15: EXPEDIENTE DOCENTE
     @GetMapping("/docente")
     public String mostrarExpedienteDocente(@RequestParam String correo, Model model) {
@@ -159,6 +195,10 @@ public class PerfilController {
         if (!vinculacionesProfesor.isEmpty()) {
             model.addAttribute("profesor", vinculacionesProfesor.get(vinculacionesProfesor.size() - 1));
         }
+
+        // NUEVO: Buscamos las materias que imparte este docente
+        List<CursoSeccion> materiasImpartidas = cursoSeccionRepository.findCursosImpartidosPorProfesor(usuario.getIdUsuario());
+        model.addAttribute("materiasImpartidas", materiasImpartidas);
 
         return "expediente-docente";
     }

@@ -32,7 +32,7 @@
 
         <div class="row g-4">
             
-            <div class="col-md-4">
+            <div class="col-md-4" th:if="${esEstudiante}">
                 <div class="card h-100 border-0 rounded-4 p-3 text-center hover-card shadow-sm border-bottom border-primary border-4">
                     <div class="card-body">
                         <div class="module-icon">🎓</div>
@@ -43,13 +43,13 @@
                 </div>
             </div>
 
-            <div class="col-md-4" th:if="${esEstudiante or esEgresado}">
-                <div class="card h-100 border-0 rounded-4 p-3 text-center hover-card shadow-sm">
+            <div class="col-md-4" th:if="${esProfesor}">
+                <div class="card h-100 border-0 rounded-4 p-3 text-center hover-card shadow-sm border-bottom border-primary border-4">
                     <div class="card-body">
-                        <div class="module-icon">📄</div>
-                        <h5 class="fw-bold">Gestión de Trámites</h5>
-                        <p class="text-muted small">Solicita constancias, certificaciones y revisa tu malla de requisitos.</p>
-                        <a href="#" class="btn btn-outline-dark w-100 mt-2">Iniciar Solicitud</a>
+                        <div class="module-icon">🎓</div>
+                        <h5 class="fw-bold">Mi Expediente</h5>
+                        <p class="text-muted small">Consulta tu ficha institucional, trayectoria y datos consolidados.</p>
+                        <a th:href="@{/perfil/docente(correo=${correo})}" class="btn btn-primary w-100 mt-2">Ingresar al Expediente</a>
                     </div>
                 </div>
             </div>
@@ -72,17 +72,6 @@
                         <h5 class="fw-bold">Control Estudiantil y de Cuentas</h5>
                         <p class="text-muted small">Cargar estudiantes, control de cuentas.</p>
                         <a th:href="@{/admin/panel(correo=${correo})}" class="btn btn-outline-info w-100 mt-2 text-dark">Ir a Gestión Administrativa</a>
-                    </div>
-                </div>
-            </div>
-
-            <div class="col-md-4" th:if="${esEstudiante or esEgresado or esProfesor}">
-                <div class="card h-100 border-0 rounded-4 p-3 text-center hover-card shadow-sm border-bottom border-success border-4">
-                    <div class="card-body">
-                        <div class="module-icon">💳</div>
-                        <h5 class="fw-bold">Finanzas y Billetera TAI</h5>
-                        <p class="text-muted small">Liquida facturas, consulta saldos y recarga tu Billetera Virtual TAI.</p>
-                        <a href="#" class="btn btn-outline-success w-100 mt-2">Ir a Cajero Virtual</a>
                     </div>
                 </div>
             </div>
@@ -128,6 +117,17 @@
                         <h5 class="fw-bold">Historial de Sesiones</h5>
                         <p class="text-muted small">Consulta el historial de inicios de sesión en el sistema.</p>
                         <a th:href="@{/admin/auditoria/sesiones(correo=${correo})}" class="btn btn-outline-danger w-100 mt-2 text-dark">Monitoreo de Ciberseguridad</a>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-4" th:if="${esAdmin}">
+                <div class="card h-100 border-0 rounded-4 p-3 text-center hover-card shadow-sm border-bottom border-warning border-4">
+                    <div class="card-body">
+                        <div class="module-icon">📚</div>
+                        <h5 class="fw-bold">Secretaría Académica</h5>
+                        <p class="text-muted small">Registra nuevas asignaturas y gestiona las inscripciones y cargas docentes.</p>
+                        <a th:href="@{/admin/academico(correo=${correo})}" class="btn btn-warning w-100 mt-2 text-dark fw-bold">Ir a Secretaría</a>
                     </div>
                 </div>
             </div>

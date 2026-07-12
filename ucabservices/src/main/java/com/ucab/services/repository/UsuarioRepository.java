@@ -27,6 +27,11 @@ public interface UsuarioRepository extends JpaRepository<Usuario, Long> {
     @Query(value = "UPDATE usuario SET conteo_intentos_fallidos = conteo_intentos_fallidos + 1 WHERE correo_institucional = :correo", nativeQuery = true)
     void incrementarIntentosFallidos(@Param("correo") String correo);
 
+    @Transactional
+    @Modifying
+    @Query(value = "CALL sp_solicitar_beca(:cedula, :tipoBeca)", nativeQuery = true)
+    void solicitarBeca(@Param("cedula") String cedula, @Param("tipoBeca") String tipoBeca);
+
     List<Usuario> findByEstadoCuentaIn(List<String> estados);
 
 }

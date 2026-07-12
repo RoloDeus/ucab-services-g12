@@ -27,18 +27,11 @@
             <div class="col-md-3 col-lg-2 sidebar">
                 <div class="sidebar-heading">Gestión Laboral</div>
                 <nav class="nav flex-column mb-4">
-                    <a class="nav-link" href="#">Datos Personales</a>
                     <a class="nav-link active" href="#">Expediente Único</a>
-                    <a class="nav-link" href="#">Recibos de Pago</a>
-                    <a class="nav-link" href="#">Carga Académica</a>
-                </nav>
-                <div class="sidebar-heading">Servicios Médicos</div>
-                <nav class="nav flex-column mb-4">
-                    <a class="nav-link" th:href="@{/perfil/carga-familiar(correo=${usuario.correoInstitucional})}">Carga Familiar</a>
                 </nav>
                 <div class="sidebar-heading">Servicios</div>
                 <nav class="nav flex-column mb-4">
-                    <a class="nav-link" href="#">Mis Reservaciones</a>
+                    <a class="nav-link" th:href="@{/perfil/carga-familiar(correo=${usuario.correoInstitucional})}">Carga Familiar</a>
                 </nav>
             </div>
 
@@ -76,6 +69,31 @@
                                 <small class="text-muted d-block mb-1">Unidad de Adscripción:</small>
                                 <strong th:text="${profesor.unidadAdscripcionPresupuestaria}">Unidad</strong>
                             </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- NUEVO: CURSOS IMPARTIDOS (PROFESOR) -->
+                <div class="card shadow-sm border-0 mb-4 rounded-4" th:if="${materiasImpartidas != null and !materiasImpartidas.empty}">
+                    <div class="card-body p-4">
+                        <h6 class="fw-bold mb-3">Cursos y Secciones Asignadas (Carga Docente)</h6>
+                        <div class="table-responsive">
+                            <table class="table table-hover align-middle mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Código de Curso</th>
+                                        <th>Asignatura Impartida</th>
+                                        <th>Rol en Aula</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr th:each="materia : ${materiasImpartidas}">
+                                        <td class="fw-bold text-dark" th:text="${materia.codigoCurso}">IN0000</td>
+                                        <td th:text="${materia.nombreMateria}">Nombre de Materia</td>
+                                        <td><span class="badge bg-primary">Profesor Titular</span></td>
+                                    </tr>
+                                </tbody>
+                            </table>
                         </div>
                     </div>
                 </div>
