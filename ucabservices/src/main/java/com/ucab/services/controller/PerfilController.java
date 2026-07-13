@@ -30,6 +30,9 @@ import java.nio.charset.StandardCharsets;
 import com.ucab.services.entities.CursoSeccion;
 import com.ucab.services.repository.CursoSeccionRepository;
 
+import java.util.stream.Collectors;
+import java.util.Comparator;
+
 import java.util.List;
 import java.util.Optional;
 
@@ -177,7 +180,7 @@ public class PerfilController {
         }
     }
 
-    // HU-15: EXPEDIENTE DOCENTE
+// HU-15: EXPEDIENTE DOCENTE
     @GetMapping("/docente")
     public String mostrarExpedienteDocente(@RequestParam String correo, Model model) {
         Optional<Usuario> oUsuario = usuarioRepository.findByCorreoInstitucional(correo);
@@ -186,9 +189,23 @@ public class PerfilController {
         Usuario usuario = oUsuario.get();
         model.addAttribute("usuario", usuario);
 
-        // Traemos todo el historial para la línea de tiempo (Trayectoria Institucional)
-        List<PeriodoVinculacion> historial = periodoVinculacionRepository.findByUsuario_IdUsuario(usuario.getIdUsuario());
-        model.addAttribute("historial", historial);
+        // 1. Traemos todo el historial de la base de datos
+        List<PeriodoVinculacion> historialCompleto = periodoVinculacionRepository.findByUsuario_IdUsuario(usuario.getIdUsuario());
+        
+        // 2. FILTRO INTELIGENTE: Agrupamos por Rol y nos quedamos solo con la fecha más antigua
+        List<PeriodoVinculacion> historialAgrupado = historialCompleto.stream()
+            .collect(Collectors.toMap(
+                PeriodoVinculacion::getRolInstitucional, // Agrupamos por el nombre del rol (Ej: "Profesor")
+                p -> p, 
+                (existente, nuevo) -> existente.getFechaInicio().isBefore(nuevo.getFechaInicio()) ? existente : nuevo // Nos quedamos con el inicio original
+            ))
+            .values()
+            .stream()
+            .sorted(Comparator.comparing(PeriodoVinculacion::getFechaInicio)) // Los ordenamos cronológicamente
+            .collect(Collectors.toList());
+
+        // Pasamos el historial limpio a la vista
+        model.addAttribute("historial", historialAgrupado);
 
         // Traemos la ficha específica de Profesor
         List<Profesor> vinculacionesProfesor = profesorRepository.findByUsuario_IdUsuario(usuario.getIdUsuario());
@@ -196,7 +213,7 @@ public class PerfilController {
             model.addAttribute("profesor", vinculacionesProfesor.get(vinculacionesProfesor.size() - 1));
         }
 
-        // NUEVO: Buscamos las materias que imparte este docente
+        // Buscamos las materias que imparte este docente
         List<CursoSeccion> materiasImpartidas = cursoSeccionRepository.findCursosImpartidosPorProfesor(usuario.getIdUsuario());
         model.addAttribute("materiasImpartidas", materiasImpartidas);
 

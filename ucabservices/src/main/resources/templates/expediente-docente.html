@@ -10,9 +10,15 @@
         .sidebar-heading { font-size: 0.75rem; font-weight: bold; color: #6c757d; text-transform: uppercase; margin: 15px 20px 5px; }
         .nav-link { color: #495057; font-weight: 500; padding: 8px 20px; }
         .nav-link:hover, .nav-link.active { background-color: #e9ecef; color: #0d6efd; border-radius: 5px; margin: 0 10px; padding: 8px 10px; }
+        
+        /* Estilos para la línea de tiempo de la trayectoria */
+        .timeline { border-left: 3px solid #dee2e6; padding-left: 15px; list-style: none; margin-left: 15px; }
+        .timeline-item { position: relative; margin-bottom: 20px; }
+        .timeline-item::before { content: ""; position: absolute; left: -24px; top: 5px; width: 15px; height: 15px; border-radius: 50%; background-color: #198754; }
+        .timeline-item.inactive::before { background-color: #adb5bd; }
     </style>
 </head>
-<body>
+<body class="bg-light">
 
     <nav class="navbar navbar-dark bg-dark">
         <div class="container-fluid px-4">
@@ -23,57 +29,62 @@
 
     <div class="container-fluid">
         <div class="row">
-            <!-- NUEVO MENÚ LATERAL PARA DOCENTES -->
-            <div class="col-md-3 col-lg-2 sidebar">
+            <div class="col-md-3 col-lg-2 sidebar bg-white">
+                
+                <div class="sidebar-heading">Navegación</div>
+                <nav class="nav flex-column mb-4">
+                    <a class="nav-link text-dark fw-bold" th:href="@{/inicio(correo=${usuario.correoInstitucional})}">← Volver al Menú Principal</a>
+                </nav>
+
                 <div class="sidebar-heading">Gestión Laboral</div>
                 <nav class="nav flex-column mb-4">
-                    <a class="nav-link active" href="#">Expediente Único</a>
+                    <a class="nav-link active" th:href="@{/perfil/docente(correo=${usuario.correoInstitucional})}">Expediente Único</a>
                 </nav>
+                
                 <div class="sidebar-heading">Servicios</div>
                 <nav class="nav flex-column mb-4">
-                    <a class="nav-link" th:href="@{/perfil/carga-familiar(correo=${usuario.correoInstitucional})}">Carga Familiar</a>
+                    <a class="nav-link" href="#">Carga Familiar</a> 
                 </nav>
             </div>
 
-            <!-- CONTENIDO PRINCIPAL -->
-            <div class="col-md-9 col-lg-10 p-4 bg-light">
-                <h2 class="fw-bold mb-1" th:text="'Prof. ' + ${usuario.nombres} + ' ' + ${usuario.apellidos}">Nombre</h2>
-                <p class="text-muted mb-4">C.I. <span th:text="${usuario.cedula}"></span></p>
+            <div class="col-md-9 col-lg-10 p-4">
+                
+                <h2 class="fw-bold mb-1" th:text="'Prof. ' + ${usuario.nombres} + ' ' + ${usuario.apellidos}">Prof. Nombre</h2>
+                <p class="text-muted mb-4" th:text="'C.I. ' + ${usuario.cedula}">C.I.</p>
 
-                <!-- LÍNEA DE TIEMPO (TRAYECTORIA) -->
-                <div class="card shadow-sm border-0 mb-4 rounded-4">
-                    <div class="card-header bg-white fw-bold py-3 border-bottom-0">Trayectoria Institucional</div>
-                    <div class="card-body px-4 pb-4">
-                        <div th:each="rol : ${historial}" class="mb-3 ps-3 border-start border-3" th:classappend="${rol.rolInstitucional == 'Profesor' ? 'border-success' : 'border-secondary'}">
-                            <h6 class="fw-bold mb-0" th:text="${rol.rolInstitucional}">Rol</h6>
-                            <small class="text-muted">Inicio: <span th:text="${rol.fechaInicio}"></span></small>
-                            <span class="badge bg-light text-dark border ms-2" th:if="${rol.rolInstitucional == 'Estudiante'}">DATOS PRESERVADOS</span>
-                        </div>
+                <div class="card shadow-sm border-0 mb-4 rounded-4" th:if="${historial != null and !historial.empty}">
+                    <div class="card-body p-4">
+                        <h6 class="fw-bold mb-4">Trayectoria Institucional</h6>
+                        <ul class="timeline mb-0">
+                            <li class="timeline-item" th:each="periodo : ${historial}" th:classappend="${periodo.fechaFinalizacion != null} ? 'inactive' : ''">
+                                <strong class="d-block text-dark" th:text="${periodo.rolInstitucional}">Rol</strong>
+                                <small class="text-muted" th:text="'Inicio: ' + ${periodo.fechaInicio}">Inicio</small>
+                                <small class="text-muted" th:if="${periodo.fechaFinalizacion != null}" th:text="' - Fin: ' + ${periodo.fechaFinalizacion}">Fin</small>
+                            </li>
+                        </ul>
                     </div>
                 </div>
 
-                <!-- FICHA DEL PROFESOR -->
-                <div class="card shadow-sm border-0 rounded-4" th:if="${profesor != null}">
-                    <div class="card-header bg-white fw-bold py-3 border-bottom-0">Ficha de Personal Académico</div>
-                    <div class="card-body p-4 pt-0">
+                <div class="card shadow-sm border-0 mb-4 rounded-4" th:if="${profesor != null}">
+                    <div class="card-body p-4">
+                        <h6 class="fw-bold mb-3">Ficha de Personal Académico</h6>
                         <div class="row">
                             <div class="col-md-4">
                                 <small class="text-muted d-block mb-1">Escalafón Docente:</small>
-                                <strong th:text="${profesor.cargoAdministrativo}">Cargo</strong>
+                                <strong th:text="${profesor.cargoAdministrativo}">Profesor</strong>
                             </div>
                             <div class="col-md-4">
                                 <small class="text-muted d-block mb-1">Código de Investigador (CDCH):</small>
-                                <strong th:text="${profesor.codigoInvestigador}">Código</strong>
+                                <strong th:text="${profesor.codigoInvestigador != null ? profesor.codigoInvestigador : 'No Registrado'}">INV-UCAB-000</strong>
                             </div>
                             <div class="col-md-4">
                                 <small class="text-muted d-block mb-1">Unidad de Adscripción:</small>
-                                <strong th:text="${profesor.unidadAdscripcionPresupuestaria}">Unidad</strong>
+                                <strong th:text="${profesor.unidadAdscripcionPresupuestaria}">Facultad</strong>
                             </div>
                         </div>
                     </div>
                 </div>
 
-                <!-- NUEVO: CURSOS IMPARTIDOS (PROFESOR) -->
                 <div class="card shadow-sm border-0 mb-4 rounded-4" th:if="${materiasImpartidas != null and !materiasImpartidas.empty}">
                     <div class="card-body p-4">
                         <h6 class="fw-bold mb-3">Cursos y Secciones Asignadas (Carga Docente)</h6>
@@ -101,5 +112,7 @@
             </div>
         </div>
     </div>
+    
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>

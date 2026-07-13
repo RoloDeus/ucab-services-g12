@@ -24,6 +24,12 @@
     <div class="container-fluid">
         <div class="row">
             <div class="col-md-3 col-lg-2 sidebar">
+                
+                <div class="sidebar-heading">Navegación</div>
+                <nav class="nav flex-column mb-4">
+                    <a class="nav-link text-dark fw-bold" th:href="@{/inicio(correo=${usuario.correoInstitucional})}">← Volver al Menú Principal</a>
+                </nav>
+
                 <div class="sidebar-heading">Mi Perfil</div>
                 <nav class="nav flex-column mb-4">
                     <a class="nav-link active" th:href="@{/perfil/academico(correo=${usuario.correoInstitucional})}">Ficha Académica</a>
@@ -148,38 +154,35 @@
                                     </div>
                                     <small class="fw-bold"><span th:text="${preparaduria.horasAyudantia}">0</span>h / 24h</small>
                                 </div>
-
-                                <button class="btn btn-outline-secondary btn-sm px-3">+ Registrar Horas</button>
                             </div>
                         </div>
                     </div>
-
-                    <!-- NUEVO: CARGA ACADÉMICA INSCRITA (ESTUDIANTE) -->
-                    <div class="card shadow-sm border-0 mb-4 rounded-4" th:if="${materiasInscritas != null and !materiasInscritas.empty}">
-                        <div class="card-body p-4">
-                            <h6 class="fw-bold mb-3">Carga Académica Actual</h6>
-                            <div class="table-responsive">
-                                <table class="table table-hover align-middle mb-0">
-                                    <thead class="table-light">
-                                        <tr>
-                                            <th>Código de Curso</th>
-                                            <th>Asignatura Inscrita</th>
-                                            <th>Estatus</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        <tr th:each="materia : ${materiasInscritas}">
-                                            <td class="fw-bold text-primary" th:text="${materia.codigoCurso}">IN0000</td>
-                                            <td th:text="${materia.nombreMateria}">Nombre de Materia</td>
-                                            <td><span class="badge bg-success">Cursando</span></td>
-                                        </tr>
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-                    </div>
-
                 </div>
+
+                <div class="card shadow-sm border-0 mb-4 rounded-4" th:if="${materiasInscritas != null and !materiasInscritas.empty}">
+                    <div class="card-body p-4">
+                        <h6 class="fw-bold mb-3">Carga Académica Actual</h6>
+                        <div class="table-responsive">
+                            <table class="table table-hover align-middle mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Código de Curso</th>
+                                        <th>Asignatura Inscrita</th>
+                                        <th>Estatus</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr th:each="materia : ${materiasInscritas}">
+                                        <td class="fw-bold text-primary" th:text="${materia.codigoCurso}">IN0000</td>
+                                        <td th:text="${materia.nombreMateria}">Nombre de Materia</td>
+                                        <td><span class="badge bg-success">Cursando</span></td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
             </div>
         </div>
     </div>
