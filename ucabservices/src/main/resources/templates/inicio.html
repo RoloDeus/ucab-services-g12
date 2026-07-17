@@ -12,7 +12,7 @@
     </style>
 </head>
 <body class="bg-light">
- 
+
     <nav class="navbar navbar-expand-lg navbar-dark bg-dark shadow-sm">
         <div class="container">
             <a class="navbar-brand fw-bold" href="#">UCAB-Services</a>
@@ -23,16 +23,17 @@
             </div>
         </div>
     </nav>
- 
+
     <div class="container mt-5">
         <div class="mb-4">
             <h2 class="fw-bold">Bienvenido(a) a tu Portal de Servicios</h2>
             <p class="text-muted">Selecciona el módulo al que deseas acceder según tu perfil activo.</p>
         </div>
- 
+
         <div class="row g-4">
-            
-            <div class="col-md-4">
+
+            <!-- Expediente estudiante -->
+            <div class="col-md-4" th:if="${esEstudiante}">
                 <div class="card h-100 border-0 rounded-4 p-3 text-center hover-card shadow-sm border-bottom border-primary border-4">
                     <div class="card-body">
                         <div class="module-icon">🎓</div>
@@ -42,7 +43,20 @@
                     </div>
                 </div>
             </div>
- 
+
+            <!-- Expediente profesor (Rolando) -->
+            <div class="col-md-4" th:if="${esProfesor}">
+                <div class="card h-100 border-0 rounded-4 p-3 text-center hover-card shadow-sm border-bottom border-primary border-4">
+                    <div class="card-body">
+                        <div class="module-icon">🎓</div>
+                        <h5 class="fw-bold">Mi Expediente</h5>
+                        <p class="text-muted small">Consulta tu ficha institucional, trayectoria y datos consolidados.</p>
+                        <a th:href="@{/perfil/docente(correo=${correo})}" class="btn btn-primary w-100 mt-2">Ingresar al Expediente</a>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Gestión de trámites -->
             <div class="col-md-4" th:if="${esEstudiante or esEgresado}">
                 <div class="card h-100 border-0 rounded-4 p-3 text-center hover-card shadow-sm">
                     <div class="card-body">
@@ -53,7 +67,8 @@
                     </div>
                 </div>
             </div>
- 
+
+            <!-- Carga familiar  -->
             <div class="col-md-4" th:if="${esProfesor or esAdmin}">
                 <div class="card h-100 border-0 rounded-4 p-3 text-center hover-card shadow-sm border-bottom border-info border-4">
                     <div class="card-body">
@@ -64,7 +79,8 @@
                     </div>
                 </div>
             </div>
- 
+
+            <!-- Control estudiantil  -->
             <div class="col-md-4" th:if="${esAdmin}">
                 <div class="card h-100 border-0 rounded-4 p-3 text-center hover-card shadow-sm border-bottom border-info border-4">
                     <div class="card-body">
@@ -75,7 +91,8 @@
                     </div>
                 </div>
             </div>
- 
+
+            <!-- Finanzas y Billetera TAI  -->
             <div class="col-md-4" th:if="${esEstudiante or esEgresado or esProfesor}">
                 <div class="card h-100 border-0 rounded-4 p-3 text-center hover-card shadow-sm border-bottom border-success border-4">
                     <div class="card-body">
@@ -86,7 +103,8 @@
                     </div>
                 </div>
             </div>
- 
+
+            <!-- Infraestructura  -->
             <div class="col-md-4" th:if="${esAdmin}">
                 <div class="card h-100 border-0 rounded-4 p-3 text-center hover-card shadow-sm border-bottom border-warning border-4">
                     <div class="card-body">
@@ -98,7 +116,8 @@
                     </div>
                 </div>
             </div>
- 
+
+            <!-- Acompañantes temporales  -->
             <div class="col-md-4">
                 <div class="card h-100 border-0 rounded-4 p-3 text-center hover-card shadow-sm border-bottom border-warning border-4">
                     <div class="card-body">
@@ -109,7 +128,8 @@
                     </div>
                 </div>
             </div>
- 
+
+            <!-- Oportunidades laborales  -->
             <div class="col-md-4" th:if="${esEgresado}">
                 <div class="card h-100 border-0 rounded-4 p-3 text-center hover-card shadow-sm border-bottom border-danger border-4">
                     <div class="card-body">
@@ -120,7 +140,8 @@
                     </div>
                 </div>
             </div>
- 
+
+            <!-- Historial de sesiones  -->
             <div class="col-md-4" th:if="${esAdmin}">
                 <div class="card h-100 border-0 rounded-4 p-3 text-center hover-card shadow-sm border-bottom border-warning border-4">
                     <div class="card-body">
@@ -131,7 +152,8 @@
                     </div>
                 </div>
             </div>
- 
+
+            <!-- Catálogo de servicios -->
             <div class="col-md-4" th:if="${esAdmin}">
                 <div class="card h-100 border-0 rounded-4 p-3 text-center hover-card shadow-sm border-bottom border-primary border-4">
                     <div class="card-body">
@@ -142,7 +164,8 @@
                     </div>
                 </div>
             </div>
- 
+
+            <!-- Pagos y facturación  -->
             <div class="col-md-4" th:if="${esAdmin or esEstudiante or esProfesor or esEgresado}">
                 <div class="card h-100 border-0 rounded-4 p-3 text-center hover-card shadow-sm border-bottom border-success border-4">
                     <div class="card-body">
@@ -153,7 +176,8 @@
                     </div>
                 </div>
             </div>
- 
+
+            <!-- Avance de trámites  -->
             <div class="col-md-4" th:if="${esAdmin}">
                 <div class="card h-100 border-0 rounded-4 p-3 text-center hover-card shadow-sm border-bottom border-secondary border-4">
                     <div class="card-body">
@@ -164,7 +188,8 @@
                     </div>
                 </div>
             </div>
- 
+
+            <!-- Reportes -->
             <div class="col-md-4" th:if="${esAdmin}">
                 <div class="card h-100 border-0 rounded-4 p-3 text-center hover-card shadow-sm border-bottom border-dark border-4">
                     <div class="card-body">
@@ -176,9 +201,20 @@
                     </div>
                 </div>
             </div>
- 
+
+            <!-- Secretaría académica  -->
+            <div class="col-md-4" th:if="${esAdmin}">
+                <div class="card h-100 border-0 rounded-4 p-3 text-center hover-card shadow-sm border-bottom border-warning border-4">
+                    <div class="card-body">
+                        <div class="module-icon">📚</div>
+                        <h5 class="fw-bold">Secretaría Académica</h5>
+                        <p class="text-muted small">Registra nuevas asignaturas y gestiona las inscripciones y cargas docentes.</p>
+                        <a th:href="@{/admin/academico(correo=${correo})}" class="btn btn-warning w-100 mt-2 text-dark fw-bold">Ir a Secretaría</a>
+                    </div>
+                </div>
+            </div>
+
         </div>
     </div>
 </body>
 </html>
- 

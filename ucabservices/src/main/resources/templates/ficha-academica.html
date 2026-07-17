@@ -24,20 +24,31 @@
     <div class="container-fluid">
         <div class="row">
             <div class="col-md-3 col-lg-2 sidebar">
+                
+                <div class="sidebar-heading">Navegación</div>
+                <nav class="nav flex-column mb-4">
+                    <a class="nav-link text-dark fw-bold" th:href="@{/inicio(correo=${usuario.correoInstitucional})}">← Volver al Menú Principal</a>
+                </nav>
+
                 <div class="sidebar-heading">Mi Perfil</div>
                 <nav class="nav flex-column mb-4">
                     <a class="nav-link active" th:href="@{/perfil/academico(correo=${usuario.correoInstitucional})}">Ficha Académica</a>
-                    <a class="nav-link" href="#">Módulo de Becas</a>
                     <a class="nav-link" th:href="@{/perfil/mis-preparadurias(correo=${usuario.correoInstitucional})}">Mis Preparadurías</a>
-                    <a class="nav-link" href="#">Trámites Estudiantiles</a>
-                </nav>
-                <div class="sidebar-heading">Servicios</div>
-                <nav class="nav flex-column mb-4">
-                    <a class="nav-link" href="#">Mis Reservaciones</a>
                 </nav>
             </div>
 
             <div class="col-md-9 col-lg-10 p-4 bg-light">
+                
+                <div class="alert alert-success alert-dismissible fade show mb-4 shadow-sm" th:if="${param.exito}">
+                    <strong>¡Aprobado!</strong> <span th:text="${param.exito}"></span>
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+
+                <div class="alert alert-danger alert-dismissible fade show mb-4 shadow-sm" th:if="${param.error}">
+                    <strong>Atención:</strong> <span th:text="${param.error}"></span>
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+
                 <h2 class="fw-bold mb-1" th:text="'Hola, ' + ${usuario.nombres} + ' ' + ${usuario.apellidos}">Hola, Usuario</h2>
                 <p class="text-muted mb-4">Rol Activo: Estudiante de Pregrado</p>
 
@@ -61,7 +72,7 @@
                                 <div class="d-flex justify-content-between">
                                     <div>
                                         <small class="text-muted d-block mb-1">Promedio Ponderado:</small>
-                                        <h3 class="fw-bold mb-0" th:text="${estudiante.promedioPonderado}">0.0</h3>
+                                        <h3 class="fw-bold mb-0 text-primary" th:text="${estudiante.promedioPonderado}">0.0</h3>
                                     </div>
                                     <div>
                                         <small class="text-muted d-block mb-1">UC Aprobadas:</small>
@@ -74,8 +85,9 @@
                 </div>
 
                 <div class="row">
-                    <div class="col-md-6 mb-4" th:if="${beca != null}">
-                        <div class="card shadow-sm border-0 rounded-4 h-100">
+                    <div class="col-md-6 mb-4">
+                        
+                        <div class="card shadow-sm border-0 rounded-4 h-100" th:if="${beca != null}">
                             <div class="card-body p-4">
                                 <h6 class="fw-bold mb-4">Seguimiento de Beca</h6>
                                 
@@ -86,7 +98,7 @@
                                     </div>
                                     <div class="col-6">
                                         <small class="text-muted d-block mb-1">Índice Exigido:</small>
-                                        <strong>> 16.0 pts</strong>
+                                        <strong th:text="${beca.tipoBeca == 'Excelencia' ? '> 16.0 pts' : '> 14.0 pts'}">pts</strong>
                                     </div>
                                 </div>
 
@@ -98,11 +110,33 @@
                                     <div class="col-6">
                                         <small class="text-muted d-block mb-1">Estado de Mantenimiento:</small>
                                         <strong class="text-success" th:if="${beca.cumplimientoIndice}">✓ Cumple Requisitos</strong>
-                                        <strong class="text-danger" th:if="${!beca.cumplimientoIndice}">✗ En Riesgo</strong>
+                                        <strong class="text-danger" th:if="${!beca.cumplimientoIndice}">✗ En Evaluación</strong>
                                     </div>
                                 </div>
                             </div>
                         </div>
+
+                        <div class="card shadow-sm border-0 rounded-4 h-100" th:if="${beca == null}">
+                            <div class="card-body p-4 d-flex flex-column justify-content-center">
+                                <h6 class="fw-bold mb-2">Gestión y Solicitud de Beca</h6>
+                                <p class="text-muted small mb-3">El sistema evaluará automáticamente tu promedio ponderado para determinar la elegibilidad del beneficio.</p>
+                                
+                                <form th:action="@{/perfil/beca/solicitar}" method="post" class="mt-auto">
+                                    <input type="hidden" name="correo" th:value="${usuario.correoInstitucional}">
+                                    <input type="hidden" name="cedula" th:value="${usuario.cedula}"> 
+
+                                    <div class="mb-3">
+                                        <label class="form-label small fw-bold">Seleccione el programa:</label>
+                                        <select class="form-select" name="tipoBeca" required>
+                                            <option value="Excelencia">Beca de Excelencia (Exige > 16.00 pts)</option>
+                                            <option value="Ayuda Económica">Ayuda Económica (Exige > 14.00 pts)</option>
+                                        </select>
+                                    </div>
+                                    <button type="submit" class="btn btn-success fw-bold w-100">Postular a Beca Automática</button>
+                                </form>
+                            </div>
+                        </div>
+
                     </div>
 
                     <div class="col-md-6 mb-4" th:if="${preparaduria != null}">
@@ -120,9 +154,31 @@
                                     </div>
                                     <small class="fw-bold"><span th:text="${preparaduria.horasAyudantia}">0</span>h / 24h</small>
                                 </div>
-
-                                <button class="btn btn-outline-secondary btn-sm px-3">+ Registrar Horas</button>
                             </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card shadow-sm border-0 mb-4 rounded-4" th:if="${materiasInscritas != null and !materiasInscritas.empty}">
+                    <div class="card-body p-4">
+                        <h6 class="fw-bold mb-3">Carga Académica Actual</h6>
+                        <div class="table-responsive">
+                            <table class="table table-hover align-middle mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Código de Curso</th>
+                                        <th>Asignatura Inscrita</th>
+                                        <th>Estatus</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr th:each="materia : ${materiasInscritas}">
+                                        <td class="fw-bold text-primary" th:text="${materia.codigoCurso}">IN0000</td>
+                                        <td th:text="${materia.nombreMateria}">Nombre de Materia</td>
+                                        <td><span class="badge bg-success">Cursando</span></td>
+                                    </tr>
+                                </tbody>
+                            </table>
                         </div>
                     </div>
                 </div>
@@ -130,5 +186,7 @@
             </div>
         </div>
     </div>
+    
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>

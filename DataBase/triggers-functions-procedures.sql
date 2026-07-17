@@ -62,6 +62,66 @@ BEGIN
 END;
 $$;
 
+--Solictud de Beca: Procedimiento Almacenado
+CREATE OR REPLACE PROCEDURE sp_solicitar_beca(
+    p_cedula VARCHAR,
+    p_tipo_beca VARCHAR
+)
+LANGUAGE plpgsql
+AS $$
+DECLARE
+    v_id_usuario BIGINT;
+    v_fecha_inicio DATE;
+    v_promedio NUMERIC(4,2);
+BEGIN
+    -- 1. Buscamos el ID, el promedio y, MUY IMPORTANTE, la fecha_inicio del estudiante
+    SELECT u.id_usuario, e.fecha_inicio, e.promedio_ponderado
+    INTO v_id_usuario, v_fecha_inicio, v_promedio
+    FROM usuario u
+    JOIN estudiante e ON u.id_usuario = e.id_usuario
+    WHERE u.cedula = p_cedula AND u.estado_cuenta = 'Activa';
+
+    IF NOT FOUND THEN
+        RAISE EXCEPTION 'Estudiante no encontrado o cuenta inactiva.';
+    END IF;
+
+    -- 2. Motor de Reglas de Negocio (Promedios)
+    IF p_tipo_beca = 'Excelencia' AND v_promedio < 16.00 THEN
+        RAISE EXCEPTION 'Solicitud rechazada. La Beca de Excelencia exige un promedio > 16.00. Promedio actual: %', v_promedio;
+    ELSIF p_tipo_beca = 'Ayuda Económica' AND v_promedio < 14.00 THEN
+        RAISE EXCEPTION 'Solicitud rechazada. La Ayuda Económica exige un promedio > 14.00. Promedio actual: %', v_promedio;
+    END IF;
+
+    -- 3. Inserción perfecta: Usamos la v_fecha_inicio para que haga match exacto con la Llave Foránea
+    INSERT INTO beca (id_usuario, fecha_inicio, tipo_beca, estatus_beneficio, cumplimiento_indice)
+    VALUES (v_id_usuario, v_fecha_inicio, p_tipo_beca, 'Activo', TRUE);
+
+END;
+$$;
+
+--Trigger de Auditoría de Mantenimiento de Beca
+CREATE OR REPLACE FUNCTION fn_auditar_mantenimiento_beca()
+RETURNS TRIGGER AS $$
+BEGIN
+    -- Si el promedio bajó de 16.00, buscamos si tiene Beca de Excelencia y la ponemos "En Evaluación"
+    IF NEW.promedio_ponderado < 16.00 THEN
+        UPDATE beca
+        SET cumplimiento_indice = FALSE,
+            estatus_beneficio = 'En Evaluación'
+        WHERE id_usuario = NEW.id_usuario 
+          AND tipo_beca = 'Excelencia' 
+          AND estatus_beneficio = 'Activo';
+    END IF;
+    
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_auditar_mantenimiento_beca
+AFTER UPDATE OF promedio_ponderado ON estudiante
+FOR EACH ROW
+EXECUTE FUNCTION fn_auditar_mantenimiento_beca();
+
 
 
 --Trigger de Ruptura de Vínculo Familiar
