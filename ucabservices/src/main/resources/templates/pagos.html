@@ -67,88 +67,94 @@
 </table>
  
 <script>
-let facturasCache = [];
- 
-async function cargarFacturas() {
-  const res = await fetch('/api/pagos/facturas-pendientes');
-  facturasCache = await res.json();
- 
-  const select = document.getElementById('factura');
-  select.innerHTML = '';
-  facturasCache.forEach(f => {
-    const opt = document.createElement('option');
-    opt.value = f.numero_control;
-    opt.textContent = `${f.numero_control} — ${f.titular} (saldo: $${f.saldo_factura})`;
-    select.appendChild(opt);
-  });
- 
-  const tbody = document.querySelector('#tablaFacturas tbody');
-  tbody.innerHTML = '';
-  facturasCache.forEach(f => {
-    const fila = document.createElement('tr');
-    fila.innerHTML = `<td>${f.numero_control}</td><td>${f.titular}</td><td>$${f.saldo_factura}</td>`;
-    tbody.appendChild(fila);
-  });
- 
-  actualizarSaldoInfo();
-}
- 
-function actualizarSaldoInfo() {
-  const numeroControl = document.getElementById('factura').value;
-  const factura = facturasCache.find(f => f.numero_control === numeroControl);
-  document.getElementById('saldoInfo').textContent = factura
-    ? `Saldo pendiente: $${factura.saldo_factura}`
-    : '';
-}
- 
-document.getElementById('factura').addEventListener('change', actualizarSaldoInfo);
- 
-document.getElementById('metodo').addEventListener('change', (e) => {
-  const esZelle = e.target.value === 'zelle';
-  document.getElementById('camposZelle').style.display = esZelle ? 'block' : 'none';
-  document.getElementById('camposTarjeta').style.display = esZelle ? 'none' : 'block';
-});
- 
-document.getElementById('formPago').addEventListener('submit', async (e) => {
-  e.preventDefault();
-  const numeroControl = document.getElementById('factura').value;
-  const factura = facturasCache.find(f => f.numero_control === numeroControl);
- 
-  const cuerpo = {
-    metodo: document.getElementById('metodo').value,
-    numeroControlFactura: numeroControl,
-    idUsuario: factura ? factura.id_usuario : null,
-    monto: Number(document.getElementById('monto').value),
-    correoOrigen: document.getElementById('correoOrigen').value,
-    nombreTitular: document.getElementById('nombreTitular').value,
-    codigoConfirmacion: document.getElementById('codigoConfirmacion').value,
-    numeroTarjeta: document.getElementById('numeroTarjeta').value,
-    fechaVencimiento: document.getElementById('fechaVencimiento').value,
-    tipoRed: document.getElementById('tipoRed').value,
-    companiaEmisora: document.getElementById('companiaEmisora').value
-  };
- 
-  const res = await fetch('/api/pagos', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(cuerpo)
-  });
-  const resultado = await res.json();
-  const mensajeDiv = document.getElementById('mensaje');
- 
-  if (res.ok) {
-    mensajeDiv.className = 'ok';
-    mensajeDiv.textContent = resultado.mensaje;
-    document.getElementById('formPago').reset();
-    cargarFacturas();
-  } else {
-    mensajeDiv.className = 'error';
-    mensajeDiv.textContent = resultado.error;
+  // Leer parámetros que vienen desde inicio.html
+  const params    = new URLSearchParams(window.location.search);
+  const correoUrl = params.get('correo') || '';
+  const rolUrl    = params.get('rol')    || '';
+  
+  let facturasCache = [];
+  
+  async function cargarFacturas() {
+    const query = new URLSearchParams({ correo: correoUrl, rol: rolUrl }).toString();
+    const res = await fetch(`/api/pagos/facturas-pendientes?${query}`);
+    facturasCache = await res.json();
+  
+    const select = document.getElementById('factura');
+    select.innerHTML = '';
+    facturasCache.forEach(f => {
+      const opt = document.createElement('option');
+      opt.value = f.numero_control;
+      opt.textContent = `${f.numero_control} — ${f.titular} (saldo: $${f.saldo_factura})`;
+      select.appendChild(opt);
+    });
+  
+    const tbody = document.querySelector('#tablaFacturas tbody');
+    tbody.innerHTML = '';
+    facturasCache.forEach(f => {
+      const fila = document.createElement('tr');
+      fila.innerHTML = `<td>${f.numero_control}</td><td>${f.titular}</td><td>$${f.saldo_factura}</td>`;
+      tbody.appendChild(fila);
+    });
+  
+    actualizarSaldoInfo();
   }
-});
- 
-cargarFacturas();
-</script>
+  
+  function actualizarSaldoInfo() {
+    const numeroControl = document.getElementById('factura').value;
+    const factura = facturasCache.find(f => f.numero_control === numeroControl);
+    document.getElementById('saldoInfo').textContent = factura
+      ? `Saldo pendiente: $${factura.saldo_factura}`
+      : '';
+  }
+  
+  document.getElementById('factura').addEventListener('change', actualizarSaldoInfo);
+  
+  document.getElementById('metodo').addEventListener('change', (e) => {
+    const esZelle = e.target.value === 'zelle';
+    document.getElementById('camposZelle').style.display = esZelle ? 'block' : 'none';
+    document.getElementById('camposTarjeta').style.display = esZelle ? 'none' : 'block';
+  });
+  
+  document.getElementById('formPago').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const numeroControl = document.getElementById('factura').value;
+    const factura = facturasCache.find(f => f.numero_control === numeroControl);
+  
+    const cuerpo = {
+      metodo: document.getElementById('metodo').value,
+      numeroControlFactura: numeroControl,
+      idUsuario: factura ? factura.id_usuario : null,
+      monto: Number(document.getElementById('monto').value),
+      correoOrigen: document.getElementById('correoOrigen').value,
+      nombreTitular: document.getElementById('nombreTitular').value,
+      codigoConfirmacion: document.getElementById('codigoConfirmacion').value,
+      numeroTarjeta: document.getElementById('numeroTarjeta').value,
+      fechaVencimiento: document.getElementById('fechaVencimiento').value,
+      tipoRed: document.getElementById('tipoRed').value,
+      companiaEmisora: document.getElementById('companiaEmisora').value
+    };
+  
+    const res = await fetch('/api/pagos', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(cuerpo)
+    });
+    const resultado = await res.json();
+    const mensajeDiv = document.getElementById('mensaje');
+  
+    if (res.ok) {
+      mensajeDiv.className = 'ok';
+      mensajeDiv.textContent = resultado.mensaje;
+      document.getElementById('formPago').reset();
+      cargarFacturas();
+    } else {
+      mensajeDiv.className = 'error';
+      mensajeDiv.textContent = resultado.error;
+    }
+  });
+  
+  cargarFacturas();
+  </script>
  
 </body>
 </html>

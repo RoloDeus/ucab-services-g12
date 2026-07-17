@@ -12,7 +12,7 @@
     </style>
 </head>
 <body class="bg-light">
-
+ 
     <nav class="navbar navbar-expand-lg navbar-dark bg-dark shadow-sm">
         <div class="container">
             <a class="navbar-brand fw-bold" href="#">UCAB-Services</a>
@@ -23,13 +23,13 @@
             </div>
         </div>
     </nav>
-
+ 
     <div class="container mt-5">
         <div class="mb-4">
             <h2 class="fw-bold">Bienvenido(a) a tu Portal de Servicios</h2>
             <p class="text-muted">Selecciona el módulo al que deseas acceder según tu perfil activo.</p>
         </div>
-
+ 
         <div class="row g-4">
             
             <div class="col-md-4">
@@ -42,7 +42,7 @@
                     </div>
                 </div>
             </div>
-
+ 
             <div class="col-md-4" th:if="${esEstudiante or esEgresado}">
                 <div class="card h-100 border-0 rounded-4 p-3 text-center hover-card shadow-sm">
                     <div class="card-body">
@@ -53,7 +53,7 @@
                     </div>
                 </div>
             </div>
-
+ 
             <div class="col-md-4" th:if="${esProfesor or esAdmin}">
                 <div class="card h-100 border-0 rounded-4 p-3 text-center hover-card shadow-sm border-bottom border-info border-4">
                     <div class="card-body">
@@ -64,7 +64,7 @@
                     </div>
                 </div>
             </div>
-
+ 
             <div class="col-md-4" th:if="${esAdmin}">
                 <div class="card h-100 border-0 rounded-4 p-3 text-center hover-card shadow-sm border-bottom border-info border-4">
                     <div class="card-body">
@@ -75,7 +75,7 @@
                     </div>
                 </div>
             </div>
-
+ 
             <div class="col-md-4" th:if="${esEstudiante or esEgresado or esProfesor}">
                 <div class="card h-100 border-0 rounded-4 p-3 text-center hover-card shadow-sm border-bottom border-success border-4">
                     <div class="card-body">
@@ -86,7 +86,7 @@
                     </div>
                 </div>
             </div>
-
+ 
             <div class="col-md-4" th:if="${esAdmin}">
                 <div class="card h-100 border-0 rounded-4 p-3 text-center hover-card shadow-sm border-bottom border-warning border-4">
                     <div class="card-body">
@@ -98,7 +98,7 @@
                     </div>
                 </div>
             </div>
-
+ 
             <div class="col-md-4">
                 <div class="card h-100 border-0 rounded-4 p-3 text-center hover-card shadow-sm border-bottom border-warning border-4">
                     <div class="card-body">
@@ -109,7 +109,7 @@
                     </div>
                 </div>
             </div>
-
+ 
             <div class="col-md-4" th:if="${esEgresado}">
                 <div class="card h-100 border-0 rounded-4 p-3 text-center hover-card shadow-sm border-bottom border-danger border-4">
                     <div class="card-body">
@@ -120,7 +120,7 @@
                     </div>
                 </div>
             </div>
-
+ 
             <div class="col-md-4" th:if="${esAdmin}">
                 <div class="card h-100 border-0 rounded-4 p-3 text-center hover-card shadow-sm border-bottom border-warning border-4">
                     <div class="card-body">
@@ -131,8 +131,54 @@
                     </div>
                 </div>
             </div>
-
+ 
+            <div class="col-md-4" th:if="${esAdmin}">
+                <div class="card h-100 border-0 rounded-4 p-3 text-center hover-card shadow-sm border-bottom border-primary border-4">
+                    <div class="card-body">
+                        <div class="module-icon">🛠️</div>
+                        <h5 class="fw-bold">Catálogo de Servicios</h5>
+                        <p class="text-muted small">Publica servicios y valida los topes de tarifa por sede.</p>
+                        <a th:href="@{/servicios}" class="btn btn-primary w-100 mt-2">Ir a Servicios</a>
+                    </div>
+                </div>
+            </div>
+ 
+            <div class="col-md-4" th:if="${esAdmin or esEstudiante or esProfesor or esEgresado}">
+                <div class="card h-100 border-0 rounded-4 p-3 text-center hover-card shadow-sm border-bottom border-success border-4">
+                    <div class="card-body">
+                        <div class="module-icon">💳</div>
+                        <h5 class="fw-bold">Pagos y Facturación</h5>
+                        <p class="text-muted small">Registra pagos y consulta facturas pendientes.</p>
+                        <a th:href="@{/pagos(correo=${correo}, rol=${rolActivo})}" class="btn btn-outline-success w-100 mt-2">Ir a Cajero Virtual</a>
+                    </div>
+                </div>
+            </div>
+ 
+            <div class="col-md-4" th:if="${esAdmin}">
+                <div class="card h-100 border-0 rounded-4 p-3 text-center hover-card shadow-sm border-bottom border-secondary border-4">
+                    <div class="card-body">
+                        <div class="module-icon">📋</div>
+                        <h5 class="fw-bold">Avance de Trámites</h5>
+                        <p class="text-muted small">Da seguimiento y completa los pasos de cada solicitud.</p>
+                        <a th:href="@{/tramites}" class="btn btn-outline-secondary w-100 mt-2">Ir a Trámites</a>
+                    </div>
+                </div>
+            </div>
+ 
+            <div class="col-md-4" th:if="${esAdmin}">
+                <div class="card h-100 border-0 rounded-4 p-3 text-center hover-card shadow-sm border-bottom border-dark border-4">
+                    <div class="card-body">
+                        <div class="module-icon">📈</div>
+                        <h5 class="fw-bold">Reportes e Inteligencia de Negocios</h5>
+                        <p class="text-muted small">Consulta reportes en PDF y ejecuta los procesos automáticos.</p>
+                        <a th:href="@{/reportes}" class="btn btn-outline-dark w-100 mt-2">Ver Reportes</a>
+                        <a th:href="@{/procesos}" class="btn btn-outline-dark w-100 mt-2">Panel de Procesos</a>
+                    </div>
+                </div>
+            </div>
+ 
         </div>
     </div>
 </body>
 </html>
+ 
