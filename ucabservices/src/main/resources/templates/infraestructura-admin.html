@@ -43,6 +43,7 @@
                             </th>
                             <th class="px-4 py-3">Aforo Máximo</th>
                             <th class="px-4 py-3">Estado / Disponibilidad</th>
+                            <th class="px-4 py-3 text-center">Acciones</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -55,9 +56,73 @@
                                 <span class="badge" th:classappend="${esp.estadoMantenimiento == 'Operativo'} ? 'bg-success' : (${esp.estadoMantenimiento == 'En Reparación'} ? 'bg-warning text-dark' : 'bg-danger')" th:text="${esp.estadoMantenimiento}"></span>
                                 <span class="badge border bg-white" th:classappend="${esp.registroDisponibilidad == 'Disponible'} ? 'text-success' : 'text-danger'" th:text="${esp.registroDisponibilidad}"></span>
                             </td>
+                            
+                            <!-- NUEVA CELDA DE ACCIONES -->
+                            <td class="px-4 py-3 text-center">
+                                <div class="d-flex justify-content-center gap-2">
+                                    <!-- Botón Modificar que abre el Modal específico de esta fila -->
+                                    <button type="button" class="btn btn-sm btn-primary fw-bold" data-bs-toggle="modal" th:data-bs-target="'#modalActualizar-' + ${esp.idEspacio.replaceAll('\s','')}">
+                                        Modificar
+                                    </button>
+
+                                    <!-- Formulario Eliminar -->
+                                    <form th:action="@{/admin/infraestructura/eliminar}" method="post" onsubmit="return confirm('¿Estás seguro de que deseas eliminar este espacio físico? Esta acción es irreversible.');">
+                                        <input type="hidden" name="correoAdmin" th:value="${admin.correoInstitucional}">
+                                        <input type="hidden" name="idEspacio" th:value="${esp.idEspacio}">
+                                        <input type="hidden" name="nombreSede" th:value="${esp.nombreSede}">
+                                        <input type="hidden" name="nombreEdificio" th:value="${esp.nombreEdificio}">
+                                        <button type="submit" class="btn btn-sm btn-danger fw-bold">Eliminar</button>
+                                    </form>
+                                </div>
+
+                                <!-- MODAL DE ACTUALIZACIÓN (Generado dinámicamente para cada espacio) -->
+                                <div class="modal fade text-start" th:id="'modalActualizar-' + ${esp.idEspacio.replaceAll('\s','')}" tabindex="-1" aria-hidden="true">
+                                    <div class="modal-dialog modal-dialog-centered">
+                                        <div class="modal-content rounded-4 border-0 shadow">
+                                            <div class="modal-header bg-primary text-white rounded-top-4">
+                                                <h5 class="modal-title fw-bold">Modificar Espacio: <span th:text="${esp.idEspacio}"></span></h5>
+                                                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                                            </div>
+                                            <form th:action="@{/admin/infraestructura/actualizar}" method="post" class="modal-body p-4 row g-3">
+                                                <input type="hidden" name="correoAdmin" th:value="${correo}">
+                                                <input type="hidden" name="idEspacio" th:value="${esp.idEspacio}">
+                                                <input type="hidden" name="nombreSede" th:value="${esp.nombreSede}">
+                                                <input type="hidden" name="nombreEdificio" th:value="${esp.nombreEdificio}">
+                                                
+                                                <div class="col-md-12">
+                                                    <label class="form-label small text-muted">Aforo Máximo</label>
+                                                    <input type="number" min="1" class="form-control" name="nuevaCapacidad" th:value="${esp.capacidadMaximaAforo}" required>
+                                                </div>
+                                                <div class="col-md-6">
+                                                    <label class="form-label small text-muted">Estado de Mantenimiento</label>
+                                                    <select class="form-select" name="nuevoEstado" required>
+                                                        <option value="Operativo" th:selected="${esp.estadoMantenimiento == 'Operativo'}">Operativo</option>
+                                                        <option value="En Reparación" th:selected="${esp.estadoMantenimiento == 'En Reparación'}">En Reparación</option>
+                                                        <option value="Clausurado" th:selected="${esp.estadoMantenimiento == 'Clausurado'}">Clausurado</option>
+                                                    </select>
+                                                </div>
+                                                <div class="col-md-6">
+                                                    <label class="form-label small text-muted">Disponibilidad Actual</label>
+                                                    <select class="form-select" name="nuevaDisponibilidad" required>
+                                                        <option value="Disponible" th:selected="${esp.registroDisponibilidad == 'Disponible'}">Disponible</option>
+                                                        <option value="Ocupado" th:selected="${esp.registroDisponibilidad == 'Ocupado'}">Ocupado</option>
+                                                    </select>
+                                                </div>
+
+                                                <div class="col-12 text-end mt-4">
+                                                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
+                                                    <button type="submit" class="btn btn-primary px-4 fw-bold">Guardar Cambios</button>
+                                                </div>
+                                            </form>
+                                        </div>
+                                    </div>
+                                </div>
+                                <!-- FIN DEL MODAL DE ACTUALIZACIÓN -->
+
+                            </td>
                         </tr>
                         <tr th:if="${pagina.empty}">
-                            <td colspan="5" class="text-center py-4 text-muted">No hay espacios registrados en la base de datos.</td>
+                            <td colspan="6" class="text-center py-4 text-muted">No hay espacios registrados en la base de datos.</td>
                         </tr>
                     </tbody>
                 </table>
@@ -94,9 +159,9 @@
                     <div class="col-md-4">
                         <label class="form-label small text-muted">Sede</label>
                         <select class="form-select" name="nombreSede" required>
-                            <option value="Montalbán">Montalbán</option>
-                            <option value="Guayana">Guayana</option>
+                            <option th:each="sede : ${listaSedes}" th:value="${sede.nombreSede}" th:text="${sede.nombreSede}"></option>
                         </select>
+                        <div th:if="${listaSedes.empty}" class="text-danger small mt-1">Primero debe crear una Sede en Jerarquía.</div>
                     </div>
                     <div class="col-md-4">
                         <label class="form-label small text-muted">Nombre del Edificio</label>

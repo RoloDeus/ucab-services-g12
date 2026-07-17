@@ -8,6 +8,8 @@ import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
@@ -20,12 +22,14 @@ public class AdminController {
     private final EstudianteRepository estudianteRepository;
     private final BecaRepository becaRepository;
     private final PreparaduriaRepository preparaduriaRepository;
+    private final ProfesorRepository profesorRepository;
 
-    public AdminController(UsuarioRepository usuarioRepository, EstudianteRepository estudianteRepository, BecaRepository becaRepository, PreparaduriaRepository preparaduriaRepository) {
+    public AdminController(UsuarioRepository usuarioRepository, EstudianteRepository estudianteRepository, BecaRepository becaRepository, PreparaduriaRepository preparaduriaRepository, ProfesorRepository profesorRepository) {
         this.usuarioRepository = usuarioRepository;
         this.estudianteRepository = estudianteRepository;
         this.becaRepository = becaRepository;
         this.preparaduriaRepository = preparaduriaRepository;
+        this.profesorRepository = profesorRepository;
     }
 
     // 1. Cargar el Panel Administrativo
@@ -108,5 +112,33 @@ public class AdminController {
             }
         }
         return "redirect:/admin/panel?correo=" + correoAdmin;
+    }
+
+    @PostMapping("/profesor/actualizar")
+    public String actualizarFichaDocente(@RequestParam String correo, 
+                                         @RequestParam String cedulaProfesor,
+                                         @RequestParam String cargoDocente, 
+                                         @RequestParam(required = false) String codigoInvestigador,
+                                         @RequestParam String unidadAdscripcion) {
+        try {
+            // Lógica de valores por defecto requerida
+            String codigoCDCH = (codigoInvestigador == null || codigoInvestigador.trim().isEmpty()) 
+                                ? "Por Asignar" : codigoInvestigador.trim();
+
+            profesorRepository.actualizarFichaProfesor(cedulaProfesor, cargoDocente, codigoCDCH, unidadAdscripcion);
+            
+            return "redirect:/admin/panel?correo=" + correo + "&exito=" + codificarMsj("Ficha del docente actualizada correctamente.");
+        } catch (Exception e) {
+            return "redirect:/admin/panel?correo=" + correo + "&error=" + codificarMsj("Error al actualizar. Verifique que la cédula pertenezca a un profesor activo.");
+        }
+    }
+
+    // Helper: codifica mensajes para incluirlos en URLs
+    private String codificarMsj(String mensaje) {
+        try {
+            return URLEncoder.encode(mensaje, StandardCharsets.UTF_8.toString());
+        } catch (Exception e) {
+            return mensaje;
+        }
     }
 }

@@ -1,6 +1,7 @@
 package com.ucab.services.controller;
 
 import com.ucab.services.entities.EspacioFisico;
+import com.ucab.services.entities.EspacioFisicoId;
 import com.ucab.services.entities.Usuario;
 import com.ucab.services.repository.EspacioFisicoRepository;
 import com.ucab.services.repository.UsuarioRepository;
@@ -17,16 +18,24 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Optional;
 
+import com.ucab.services.entities.Sede;
+import com.ucab.services.repository.SedeRepository;
+import java.util.List;
+
 @Controller
 @RequestMapping("/admin/infraestructura")
 public class InfraestructuraController {
 
     private final UsuarioRepository usuarioRepository;
     private final EspacioFisicoRepository espacioFisicoRepository;
+    private final SedeRepository sedeRepository;
 
-    public InfraestructuraController(UsuarioRepository usuarioRepository, EspacioFisicoRepository espacioFisicoRepository) {
+    public InfraestructuraController(UsuarioRepository usuarioRepository,
+                                     EspacioFisicoRepository espacioFisicoRepository,
+                                     SedeRepository sedeRepository) {
         this.usuarioRepository = usuarioRepository;
         this.espacioFisicoRepository = espacioFisicoRepository;
+        this.sedeRepository = sedeRepository;
     }
 
     // Listar espacios físicos con paginación y ordenamiento
@@ -58,7 +67,9 @@ public class InfraestructuraController {
         model.addAttribute("sortField", sortField);
         model.addAttribute("sortDir", sortDir);
         model.addAttribute("reverseSortDir", sortDir.equals("asc") ? "desc" : "asc");
-
+        
+        List<Sede> listaSedes = sedeRepository.findAll();
+        model.addAttribute("listaSedes", listaSedes);
         return "infraestructura-admin";
     }
 
@@ -101,6 +112,69 @@ public class InfraestructuraController {
             return "redirect:/admin/infraestructura?correo=" + correoAdmin + "&error=" + URLEncoder.encode(mensajeError, StandardCharsets.UTF_8);
         }
         
+        return "redirect:/admin/infraestructura?correo=" + correoAdmin;
+    }
+
+    @PostMapping("/eliminar")
+    public String eliminarEspacio(
+            @RequestParam String correoAdmin, 
+            @RequestParam String idEspacio,
+            @RequestParam String nombreSede,
+            @RequestParam String nombreEdificio) {
+        
+        try {
+            // 1. Instanciamos la llave primaria compuesta
+            EspacioFisicoId espacioFisicoId = new EspacioFisicoId();
+            
+            // 2. Llenamos TODOS los campos que conforman esa llave
+            espacioFisicoId.setIdEspacio(idEspacio);
+            espacioFisicoId.setNombreSede(nombreSede);
+            espacioFisicoId.setNombreEdificio(nombreEdificio);
+            
+            // 3. Ejecutamos el DELETE mágico
+            espacioFisicoRepository.deleteById(espacioFisicoId);
+            
+            String msjExito = "Espacio físico eliminado correctamente.";
+            return "redirect:/admin/infraestructura?correo=" + correoAdmin + "&exito=" + URLEncoder.encode(msjExito, StandardCharsets.UTF_8);
+            
+        } catch (Exception e) {
+            String msjError = "No se puede eliminar el espacio. Es posible que esté siendo utilizado en la carga académica actual.";
+            return "redirect:/admin/infraestructura?correo=" + correoAdmin + "&error=" + URLEncoder.encode(msjError, StandardCharsets.UTF_8);
+        }
+    }
+
+    // Endpoint para actualizar un espacio físico
+    @PostMapping("/actualizar")
+    @Transactional
+    public String actualizarEspacio(
+            @RequestParam String correoAdmin,
+            @RequestParam String idEspacio,
+            @RequestParam String nombreSede, 
+            @RequestParam String nombreEdificio, 
+            @RequestParam Integer nuevaCapacidad,
+            @RequestParam String nuevoEstado,
+            @RequestParam String nuevaDisponibilidad) {
+
+        try {
+            EspacioFisicoId id = new EspacioFisicoId();
+            id.setIdEspacio(idEspacio);
+            id.setNombreSede(nombreSede);
+            id.setNombreEdificio(nombreEdificio);
+
+            Optional<EspacioFisico> oEspacio = espacioFisicoRepository.findById(id);
+            
+            if (oEspacio.isPresent()) {
+                EspacioFisico espacio = oEspacio.get();
+                espacio.setCapacidadMaximaAforo(nuevaCapacidad);
+                espacio.setEstadoMantenimiento(nuevoEstado);
+                espacio.setRegistroDisponibilidad(nuevaDisponibilidad);
+                
+                espacioFisicoRepository.save(espacio);
+                return "redirect:/admin/infraestructura?correo=" + correoAdmin + "&exito=" + URLEncoder.encode("Espacio actualizado correctamente.", StandardCharsets.UTF_8);
+            }
+        } catch (Exception e) {
+            return "redirect:/admin/infraestructura?correo=" + correoAdmin + "&error=" + URLEncoder.encode("Error al actualizar.", StandardCharsets.UTF_8);
+        }
         return "redirect:/admin/infraestructura?correo=" + correoAdmin;
     }
 }

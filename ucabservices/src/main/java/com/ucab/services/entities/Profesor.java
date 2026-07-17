@@ -14,7 +14,7 @@ public class Profesor extends PeriodoVinculacion {
     private String unidadAdscripcionPresupuestaria;
 
     @Column(name = "codigo_investigador", length = 50)
-    private String codigoInvestigador; // Es opcional según tu script
+    private String codigoInvestigador; 
 
     @Column(name = "cargo_administrativo", nullable = false, length = 100)
     private String cargoAdministrativo;
