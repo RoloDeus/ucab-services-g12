@@ -63,6 +63,37 @@ GRANT rol_usuario_comunidad TO db_marlene_profesora;
 GRANT rol_admin_infraestructura TO db_roberto_admin_sede;
 GRANT rol_auditor_seguridad TO db_auditor_ti_admin;
 
+
+-- ============================================================
+-- HU-60 — Control de Acceso por Rol (RBAC)
+-- Un profesor solo ve a los estudiantes de los cursos que imparte.
+-- (Cuentas de login y datos de prueba en archivos respectivos.)
+-- ============================================================
+CREATE ROLE rol_profesor NOLOGIN;
+
+GRANT SELECT ON estudiante    TO rol_profesor;
+GRANT SELECT ON inscribe      TO rol_profesor;
+GRANT SELECT ON imparte       TO rol_profesor;
+GRANT SELECT ON curso_seccion TO rol_profesor;
+GRANT SELECT ON usuario       TO rol_profesor;
+
+ALTER TABLE estudiante ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS pol_profesor_sus_alumnos ON estudiante;
+CREATE POLICY pol_profesor_sus_alumnos ON estudiante
+    FOR SELECT
+    TO rol_profesor
+    USING (
+        EXISTS (
+            SELECT 1
+            FROM inscribe i
+            JOIN imparte im     ON im.codigo_curso = i.codigo_curso
+            JOIN usuario u_prof ON u_prof.id_usuario = im.id_profesor
+            WHERE i.id_estudiante = estudiante.id_usuario
+              AND u_prof.correo_institucional = current_user
+        )
+    );
+
 -- ==============================================================================
 -- FIN DEL SCRIPT DE SEGURIDAD
 -- ==============================================================================
