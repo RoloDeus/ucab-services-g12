@@ -14,6 +14,8 @@ import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Optional;
 
@@ -97,5 +99,30 @@ public class JerarquiaController {
             return "redirect:/admin/jerarquia?correo=" + correoAdmin + "&error=Error al guardar el edificio: " + e.getMessage();
         }
         return "redirect:/admin/jerarquia?correo=" + correoAdmin;
+    }
+
+    @PostMapping("/sede/eliminar")
+    public String eliminarSede(@RequestParam String correoAdmin, @RequestParam String nombreSede) {
+        try {
+            sedeRepository.deleteById(nombreSede);
+            return "redirect:/admin/jerarquia?correo=" + correoAdmin + "&exito=" + URLEncoder.encode("Sede eliminada correctamente.", StandardCharsets.UTF_8);
+        } catch (Exception e) {
+            return "redirect:/admin/jerarquia?correo=" + correoAdmin + "&error=" + URLEncoder.encode("No se puede eliminar la sede porque aún tiene edificios asignados.", StandardCharsets.UTF_8);
+        }
+    }
+
+    @PostMapping("/edificio/eliminar")
+    public String eliminarEdificio(@RequestParam String correoAdmin, @RequestParam String nombreSede, @RequestParam String nombreEdificio) {
+        try {
+            Optional<Edificacion> edificio = edificacionRepository.findAll().stream()
+                    .filter(e -> nombreSede.equals(e.getNombreSede()) && nombreEdificio.equals(e.getNombreEdificio()))
+                    .findFirst();
+            if (edificio.isPresent()) {
+                edificacionRepository.delete(edificio.get());
+            }
+            return "redirect:/admin/jerarquia?correo=" + correoAdmin + "&exito=" + URLEncoder.encode("Edificio eliminado correctamente.", StandardCharsets.UTF_8);
+        } catch (Exception e) {
+            return "redirect:/admin/jerarquia?correo=" + correoAdmin + "&error=" + URLEncoder.encode("No se puede eliminar el edificio porque contiene aulas registradas.", StandardCharsets.UTF_8);
+        }
     }
 }

@@ -77,9 +77,9 @@ public class TrayectoriaService {
         profesor.setRolInstitucional("Profesor"); // Atributo Padre
         
         // Atributos de Profesor
-        profesor.setUnidadAdscripcionPresupuestaria("Facultad de Ingeniería");
-        profesor.setCodigoInvestigador("INV-UCAB-8809");
-        profesor.setCargoAdministrativo("Profesor Asociado"); 
+        profesor.setUnidadAdscripcionPresupuestaria("Por asignar");
+        profesor.setCodigoInvestigador("Por asignar");
+        profesor.setCargoAdministrativo("Por asignar"); 
 
         try {
             profesorRepository.save(profesor);
