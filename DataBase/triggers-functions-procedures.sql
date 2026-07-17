@@ -595,3 +595,523 @@ CREATE TRIGGER trg_validar_pago_tai
 BEFORE INSERT ON pago_tai 
 FOR EACH ROW
 EXECUTE FUNCTION fn_validar_y_procesar_pago();
+
+------------------------------------- Triggers Funciones (paola)---------------------------------------------
+-- ============================================================
+-- HU-66 — Bitácora Inmutable de Tiempos
+-- ============================================================
+
+-- 1) Función para grabar la hora automáticamente al completar un paso
+CREATE OR REPLACE FUNCTION fn_grabar_hora_finalizacion()
+RETURNS TRIGGER AS $$
+BEGIN
+    IF NEW.estado_paso = 'Completado' AND NEW.fecha_hora_finalizacion_exacta IS NULL THEN
+        NEW.fecha_hora_finalizacion_exacta := CURRENT_TIMESTAMP;
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Trigger asociado a fn_grabar_hora_finalizacion
+DROP TRIGGER IF EXISTS trg_grabar_hora ON paso_actividad;
+CREATE TRIGGER trg_grabar_hora
+    BEFORE INSERT OR UPDATE ON paso_actividad
+    FOR EACH ROW
+    EXECUTE FUNCTION fn_grabar_hora_finalizacion();
+
+-- 2) Función para prohibir la edición de la hora de finalización
+CREATE OR REPLACE FUNCTION fn_bloquear_edicion_hora()
+RETURNS TRIGGER AS $$
+BEGIN
+    IF OLD.fecha_hora_finalizacion_exacta IS NOT NULL
+       AND NEW.fecha_hora_finalizacion_exacta IS DISTINCT FROM OLD.fecha_hora_finalizacion_exacta THEN
+        RAISE EXCEPTION 'La hora de finalización es inmutable y no puede modificarse (paso % de solicitud %).',
+            OLD.secuencia_paso, OLD.id_solicitud;
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Trigger asociado a fn_bloquear_edicion_hora
+DROP TRIGGER IF EXISTS trg_bloquear_hora ON paso_actividad;
+CREATE TRIGGER trg_bloquear_hora
+    BEFORE UPDATE ON paso_actividad
+    FOR EACH ROW
+    EXECUTE FUNCTION fn_bloquear_edicion_hora();
+
+
+-- ============================================================
+-- HU-65 — Bloqueo de Espacios (anti-solapamiento)
+-- ============================================================
+
+-- Función para rechazar reservas solapadas en fecha y bloque horario
+CREATE OR REPLACE FUNCTION fn_bloquear_reserva_solapada()
+RETURNS TRIGGER AS $$
+DECLARE
+    conflictos INTEGER;
+BEGIN
+    SELECT COUNT(*)
+    INTO conflictos
+    FROM reserva r
+    WHERE r.nombre_sede     = NEW.nombre_sede
+      AND r.nombre_edificio = NEW.nombre_edificio
+      AND r.id_espacio      = NEW.id_espacio
+      AND r.fecha_reserva   = NEW.fecha_reserva
+      AND r.bloque_horario_solicitado = NEW.bloque_horario_solicitado
+      AND NOT (r.id_solicitud = NEW.id_solicitud AND r.id_usuario = NEW.id_usuario);
+
+    IF conflictos > 0 THEN
+        RAISE EXCEPTION 'El espacio % ya está reservado el % en el bloque %.',
+            NEW.id_espacio, NEW.fecha_reserva, NEW.bloque_horario_solicitado;
+    END IF;
+
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Trigger asociado a fn_bloquear_reserva_solapada
+DROP TRIGGER IF EXISTS trg_bloquear_reserva ON reserva;
+CREATE TRIGGER trg_bloquear_reserva
+    BEFORE INSERT OR UPDATE ON reserva
+    FOR EACH ROW
+    EXECUTE FUNCTION fn_bloquear_reserva_solapada();
+
+
+-- ============================================================
+-- HU-61 — Validación de Límites de Tarifas
+-- ============================================================
+
+-- Función para impedir publicar servicios que superen el tope de su categoría por sede
+CREATE OR REPLACE FUNCTION fn_validar_limite_tarifa()
+RETURNS TRIGGER AS $$
+DECLARE
+    precio_total NUMERIC(15,2);
+    tope_sede    NUMERIC(15,2);
+BEGIN
+    precio_total := NEW.precio_base_institucional + NEW.ajuste_ubicacion;
+
+    IF NEW.nombre_sede IS NULL THEN
+        RAISE EXCEPTION 'El servicio no tiene sede asignada; no se puede validar su tope.';
+    END IF;
+
+    SELECT dl.monto_limite_maximo
+    INTO tope_sede
+    FROM define_limite dl
+    WHERE dl.nombre_categoria = NEW.nombre_categoria
+      AND dl.nombre_sede      = NEW.nombre_sede;
+
+    IF tope_sede IS NULL THEN
+        RAISE EXCEPTION 'No hay tope definido para la categoría "%" en la sede "%".',
+            NEW.nombre_categoria, NEW.nombre_sede;
+    END IF;
+
+    IF precio_total > tope_sede THEN
+        RAISE EXCEPTION 'El precio % supera el tope de % para la categoría "%" en la sede "%".',
+            precio_total, tope_sede, NEW.nombre_categoria, NEW.nombre_sede;
+    END IF;
+
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Trigger asociado a fn_validar_limite_tarifa
+DROP TRIGGER IF EXISTS trg_validar_tarifa ON servicio_publicado;
+CREATE TRIGGER trg_validar_tarifa
+    BEFORE INSERT OR UPDATE ON servicio_publicado
+    FOR EACH ROW
+    EXECUTE FUNCTION fn_validar_limite_tarifa();
+
+
+-- ============================================================
+-- HU-62 — Liquidación Automática de Facturas
+-- ============================================================
+
+-- Función para descontar del saldo con cada pago y bloquear facturas liquidadas
+CREATE OR REPLACE FUNCTION fn_liquidar_factura()
+RETURNS TRIGGER AS $$
+DECLARE
+    saldo_actual NUMERIC(15,2);
+BEGIN
+    SELECT saldo_factura
+    INTO saldo_actual
+    FROM factura
+    WHERE numero_control = NEW.numero_control_factura
+      AND id_usuario     = NEW.id_usuario;
+
+    IF saldo_actual <= 0 THEN
+        RAISE EXCEPTION 'La factura % ya está liquidada; no acepta más pagos.',
+            NEW.numero_control_factura;
+    END IF;
+
+    IF NEW.monto_operacion > saldo_actual THEN
+        RAISE EXCEPTION 'El pago de % excede el saldo pendiente de la factura % (saldo: %).',
+            NEW.monto_operacion, NEW.numero_control_factura, saldo_actual;
+    END IF;
+
+    UPDATE factura
+    SET saldo_factura = saldo_factura - NEW.monto_operacion
+    WHERE numero_control = NEW.numero_control_factura
+      AND id_usuario     = NEW.id_usuario;
+
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Triggers asociados a fn_liquidar_factura (se ejecutan tras registrar pagos en las 4 pasarelas)
+DROP TRIGGER IF EXISTS trg_liquidar_zelle    ON pago_zelle;
+CREATE TRIGGER trg_liquidar_zelle    AFTER INSERT ON pago_zelle    FOR EACH ROW EXECUTE FUNCTION fn_liquidar_factura();
+
+DROP TRIGGER IF EXISTS trg_liquidar_tarjeta  ON pago_tarjeta;
+CREATE TRIGGER trg_liquidar_tarjeta  AFTER INSERT ON pago_tarjeta  FOR EACH ROW EXECUTE FUNCTION fn_liquidar_factura();
+
+DROP TRIGGER IF EXISTS trg_liquidar_movil    ON pago_movil;
+CREATE TRIGGER trg_liquidar_movil    AFTER INSERT ON pago_movil    FOR EACH ROW EXECUTE FUNCTION fn_liquidar_factura();
+
+DROP TRIGGER IF EXISTS trg_liquidar_efectivo ON pago_efectivo;
+CREATE TRIGGER trg_liquidar_efectivo AFTER INSERT ON pago_efectivo FOR EACH ROW EXECUTE FUNCTION fn_liquidar_factura();
+
+
+-- ============================================================
+-- HU-63 — Suspensión por Desvinculación
+-- ============================================================
+
+-- Función para suspender cuentas de usuario sin vínculos activos
+CREATE OR REPLACE FUNCTION fn_suspender_por_desvinculacion()
+RETURNS TRIGGER AS $$
+DECLARE
+    vinculos_activos INTEGER;
+BEGIN
+    SELECT COUNT(*)
+    INTO vinculos_activos
+    FROM periodo_vinculacion
+    WHERE id_usuario = NEW.id_usuario
+      AND (fecha_finalizacion IS NULL OR fecha_finalizacion > CURRENT_DATE);
+
+    IF vinculos_activos = 0 THEN
+        UPDATE usuario
+        SET estado_cuenta = 'Suspendida'
+        WHERE id_usuario = NEW.id_usuario
+          AND estado_cuenta <> 'Suspendida';
+
+        RAISE NOTICE 'Usuario % suspendido: no le quedan vínculos activos.', NEW.id_usuario;
+    END IF;
+
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Trigger asociado a fn_suspender_por_desvinculacion
+DROP TRIGGER IF EXISTS trg_suspender_desvinculacion ON periodo_vinculacion;
+CREATE TRIGGER trg_suspender_desvinculacion
+    AFTER INSERT OR UPDATE ON periodo_vinculacion
+    FOR EACH ROW
+    EXECUTE FUNCTION fn_suspender_por_desvinculacion();
+
+-- ============================================================
+-- HU-60 — Control de Acceso por Rol (RBAC / RLS)
+-- ============================================================
+CREATE ROLE rol_profesor NOLOGIN;
+
+GRANT SELECT ON estudiante    TO rol_profesor;
+GRANT SELECT ON inscribe      TO rol_profesor;
+GRANT SELECT ON imparte       TO rol_profesor;
+GRANT SELECT ON curso_seccion TO rol_profesor;
+GRANT SELECT ON usuario       TO rol_profesor;
+
+ALTER TABLE estudiante ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS pol_profesor_sus_alumnos ON estudiante;
+CREATE POLICY pol_profesor_sus_alumnos ON estudiante
+    FOR SELECT
+    TO rol_profesor
+    USING (
+        EXISTS (
+            SELECT 1
+            FROM inscribe i
+            JOIN imparte im     ON im.codigo_curso = i.codigo_curso
+            JOIN usuario u_prof ON u_prof.id_usuario = im.id_profesor
+            WHERE i.id_estudiante = estudiante.id_usuario
+              AND u_prof.correo_institucional = current_user
+        )
+    );
+
+
+-- ============================================================
+-- HU-67 — Cálculo de Tiempos (devuelven días ENTEROS)
+-- ============================================================
+
+-- Función para calcular la duración total de un trámite
+DROP FUNCTION IF EXISTS fn_duracion_tramite(BIGINT, BIGINT);
+CREATE FUNCTION fn_duracion_tramite(p_id_solicitud BIGINT, p_id_usuario BIGINT)
+RETURNS INTEGER AS $$
+DECLARE
+    v_apertura TIMESTAMP;
+    v_cierre   TIMESTAMP;
+BEGIN
+    SELECT fecha_hora_apertura, fecha_hora_cierre
+    INTO v_apertura, v_cierre
+    FROM solicitud_servicio
+    WHERE id_solicitud = p_id_solicitud AND id_usuario = p_id_usuario;
+
+    IF v_apertura IS NULL THEN
+        RETURN NULL;
+    END IF;
+
+    IF v_cierre IS NULL THEN
+        v_cierre := CURRENT_TIMESTAMP;   -- trámite abierto: mide hasta hoy
+    END IF;
+
+    RETURN ROUND(EXTRACT(EPOCH FROM (v_cierre - v_apertura)) / 86400.0);
+END;
+$$ LANGUAGE plpgsql;
+
+-- Función para calcular el tiempo transcurrido entre un paso y su anterior
+DROP FUNCTION IF EXISTS fn_duracion_paso(BIGINT, BIGINT, INT);
+CREATE FUNCTION fn_duracion_paso(p_id_solicitud BIGINT, p_id_usuario BIGINT, p_secuencia INT)
+RETURNS INTEGER AS $$
+DECLARE
+    v_fin_actual   TIMESTAMP;
+    v_fin_anterior TIMESTAMP;
+BEGIN
+    SELECT fecha_hora_finalizacion_exacta INTO v_fin_actual
+    FROM paso_actividad
+    WHERE id_solicitud = p_id_solicitud AND id_usuario = p_id_usuario AND secuencia_paso = p_secuencia;
+
+    SELECT fecha_hora_finalizacion_exacta INTO v_fin_anterior
+    FROM paso_actividad
+    WHERE id_solicitud = p_id_solicitud AND id_usuario = p_id_usuario AND secuencia_paso = p_secuencia - 1;
+
+    IF v_fin_actual IS NULL OR v_fin_anterior IS NULL THEN
+        RETURN NULL;
+    END IF;
+
+    RETURN ROUND(EXTRACT(EPOCH FROM (v_fin_actual - v_fin_anterior)) / 86400.0);
+END;
+$$ LANGUAGE plpgsql;
+
+
+-- ============================================================
+-- HU-68 — Cálculo del Índice de Recurrencia
+-- ============================================================
+
+-- Función de apoyo para obtener el índice de un usuario específico
+CREATE OR REPLACE FUNCTION fn_calcular_indice_recurrencia(p_id_usuario BIGINT)
+RETURNS INTEGER AS $$
+DECLARE
+    v_solicitudes INTEGER;
+    v_facturas    INTEGER;
+BEGIN
+    SELECT COUNT(*) INTO v_solicitudes
+    FROM solicitud_servicio
+    WHERE id_usuario = p_id_usuario
+      AND fecha_hora_cierre IS NOT NULL
+      AND fecha_hora_cierre >= CURRENT_DATE - INTERVAL '1 year';
+
+    SELECT COUNT(*) INTO v_facturas
+    FROM factura
+    WHERE id_usuario = p_id_usuario
+      AND saldo_factura <= 0
+      AND fecha_emision >= CURRENT_DATE - INTERVAL '1 year';
+
+    RETURN v_solicitudes + v_facturas;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Procedimiento batch para actualizar de forma masiva a todos los usuarios
+CREATE OR REPLACE PROCEDURE sp_actualizar_indices_recurrencia()
+LANGUAGE plpgsql AS $$
+DECLARE
+    v_usuario RECORD;
+BEGIN
+    FOR v_usuario IN SELECT id_usuario FROM usuario LOOP
+        UPDATE usuario
+        SET indice_recurrencia = fn_calcular_indice_recurrencia(v_usuario.id_usuario)
+        WHERE id_usuario = v_usuario.id_usuario;
+    END LOOP;
+    RAISE NOTICE 'Índices de recurrencia actualizados para todos los usuarios.';
+END;
+$$;
+
+
+-- ============================================================
+-- HU-69 — Beneficios por Fidelidad
+-- ============================================================
+
+-- Función para catalogar el nivel del usuario según su índice
+CREATE OR REPLACE FUNCTION fn_categoria_fidelidad(p_id_usuario BIGINT)
+RETURNS VARCHAR AS $$
+DECLARE
+    v_indice INTEGER;
+BEGIN
+    SELECT indice_recurrencia INTO v_indice
+    FROM usuario WHERE id_usuario = p_id_usuario;
+
+    IF v_indice IS NULL THEN
+        RETURN 'Regular';
+    END IF;
+
+    IF v_indice >= 6 THEN
+        RETURN 'Preferencial';
+    ELSIF v_indice >= 3 THEN
+        RETURN 'Frecuente';
+    ELSE
+        RETURN 'Regular';
+    END IF;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Función de apoyo para asignar el porcentaje de descuento respectivo
+CREATE OR REPLACE FUNCTION fn_descuento_fidelidad(p_categoria VARCHAR)
+RETURNS NUMERIC AS $$
+BEGIN
+    RETURN CASE p_categoria
+        WHEN 'Preferencial' THEN 10.0
+        WHEN 'Frecuente'    THEN 5.0
+        ELSE 0.0
+    END;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Procedimiento batch para actualizar categorías a nivel general
+CREATE OR REPLACE PROCEDURE sp_actualizar_categorias_fidelidad()
+LANGUAGE plpgsql AS $$
+DECLARE
+    v_usuario RECORD;
+BEGIN
+    FOR v_usuario IN SELECT id_usuario FROM usuario LOOP
+        UPDATE usuario
+        SET categoria_fidelidad = fn_categoria_fidelidad(v_usuario.id_usuario)
+        WHERE id_usuario = v_usuario.id_usuario;
+    END LOOP;
+    RAISE NOTICE 'Categorías de fidelidad actualizadas para todos los usuarios.';
+END;
+$$;
+
+
+-- ============================================================
+-- HU-64 — Detección de Mayoría de Edad
+-- ============================================================
+
+-- Procedimiento batch para purgar o exigir requisitos según la edad (18 años)
+CREATE OR REPLACE PROCEDURE sp_detectar_mayoria_edad()
+LANGUAGE plpgsql AS $$
+DECLARE
+    v_afectados INTEGER;
+BEGIN
+    UPDATE beneficiario_familiar
+    SET esquema_vacunacion                 = 'No Aplica',
+        centro_educacion_inicial           = 'No Aplica',
+        constancia_estudios_universitarios = 'Pendiente',
+        certificado_solteria               = 'Pendiente'
+    WHERE EXTRACT(YEAR FROM age(fecha_nacimiento)) >= 18
+      AND (esquema_vacunacion <> 'No Aplica' OR centro_educacion_inicial <> 'No Aplica');
+
+    GET DIAGNOSTICS v_afectados = ROW_COUNT;
+    RAISE NOTICE 'Beneficiarios que pasaron a mayoría de edad: %', v_afectados;
+END;
+$$;
+
+
+-- ============================================================
+-- HU-71 — Actualización Masiva de Tasas (BCV)
+-- ============================================================
+
+-- Función para obtener la tasa oficial más reciente
+CREATE OR REPLACE FUNCTION fn_tasa_bcv_actual()
+RETURNS NUMERIC AS $$
+DECLARE
+    v_tasa NUMERIC;
+BEGIN
+    SELECT monto_oficial INTO v_tasa
+    FROM tasa_cambio_bcv
+    ORDER BY fecha_hora_vigencia DESC
+    LIMIT 1;
+    RETURN v_tasa;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Procedimiento para registrar de manera ordenada una nueva tasa
+CREATE OR REPLACE PROCEDURE sp_sincronizar_tasa_bcv(p_nueva_tasa NUMERIC)
+LANGUAGE plpgsql AS $$
+BEGIN
+    INSERT INTO tasa_cambio_bcv (fecha_hora_vigencia, monto_oficial)
+    VALUES (CURRENT_TIMESTAMP, p_nueva_tasa);
+    RAISE NOTICE 'Tasa BCV registrada: % Bs por dólar (vigencia %).',
+        p_nueva_tasa, CURRENT_TIMESTAMP;
+END;
+$$;
+
+
+-- ============================================================
+-- HU-72 — Protocolo de Limpieza (Soft-Delete)
+-- ============================================================
+
+-- Procedimiento batch para archivar registros inactivos por más de un año
+CREATE OR REPLACE PROCEDURE sp_limpieza_soft_delete()
+LANGUAGE plpgsql AS $$
+DECLARE
+    v_benef INTEGER;
+    v_acom  INTEGER;
+BEGIN
+    UPDATE beneficiario_familiar b
+    SET estatus_registro = 'Archivado'
+    WHERE b.estatus_registro <> 'Archivado'
+      AND NOT EXISTS (
+            SELECT 1 FROM historial_fechas_cobertura h
+            WHERE h.ci_familiar = b.ci_familiar
+              AND (h.fecha_fin IS NULL OR h.fecha_fin >= CURRENT_DATE - INTERVAL '1 year')
+      )
+      AND EXISTS (
+            SELECT 1 FROM historial_fechas_cobertura h2 WHERE h2.ci_familiar = b.ci_familiar
+      );
+    GET DIAGNOSTICS v_benef = ROW_COUNT;
+
+    UPDATE acompanante_temporal a
+    SET estatus_registro = 'Archivado'
+    WHERE a.estatus_registro <> 'Archivado'
+      AND a.fecha_fin_acceso IS NOT NULL
+      AND a.fecha_fin_acceso < CURRENT_DATE - INTERVAL '1 year';
+    GET DIAGNOSTICS v_acom = ROW_COUNT;
+
+    RAISE NOTICE 'Archivados -> beneficiarios: %, acompañantes: %', v_benef, v_acom;
+END;
+$$;
+
+
+-- ============================================================
+-- HU-70 — Cierre Masivo Mensual de Facturación
+-- ============================================================
+CREATE SEQUENCE IF NOT EXISTS seq_factura_cierre START 1;
+
+-- Procedimiento batch para consolidar consumos pendientes en facturas de cierre
+CREATE OR REPLACE PROCEDURE sp_cierre_mensual_facturas()
+LANGUAGE plpgsql AS $$
+DECLARE
+    v_folio       RECORD;
+    v_total       NUMERIC(15,2);
+    v_contador    INTEGER := 0;
+    v_correlativo INTEGER;
+BEGIN
+    FOR v_folio IN
+        SELECT ec.numero_folio, ec.id_usuario
+        FROM estado_cuenta ec
+        WHERE NOT EXISTS (
+            SELECT 1 FROM factura f WHERE f.numero_folio = ec.numero_folio
+        )
+    LOOP
+        SELECT COALESCE(SUM(cantidad * precio_unitario + impuestos_ley), 0)
+        INTO v_total
+        FROM item_consumo
+        WHERE numero_folio = v_folio.numero_folio;
+
+        IF v_total > 0 THEN
+            v_contador := v_contador + 1;
+            v_correlativo := nextval('seq_factura_cierre');
+            INSERT INTO factura (numero_control, id_usuario, numero_folio, fecha_emision, saldo_factura)
+            VALUES ('FAC-AUTO-' || v_correlativo, v_folio.id_usuario, v_folio.numero_folio, CURRENT_DATE, v_total);
+        END IF;
+    END LOOP;
+
+    RAISE NOTICE 'Cierre mensual completado. Facturas generadas: %', v_contador;
+END;
+$$;
